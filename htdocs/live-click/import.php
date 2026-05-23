@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Import songs from data.js into the database.
  * Admin only. Run via browser: /import.php
