@@ -1,0 +1,154 @@
+<?php
+require_once __DIR__ . '/auth.php';
+$user = currentUser();
+$activeBands = $user ? userBands($user['id']) : [];
+$currentPage = basename($_SERVER['PHP_SELF']);
+?>
+<!doctype html>
+<html lang="nl" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?= htmlspecialchars($pageTitle ?? 'LiveGig') ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="assets/css/app.css" rel="stylesheet">
+</head>
+<body>
+
+<nav id="clicktrack-nav" class="fixed-top">
+
+    <!-- ROW 1: Click track controls -->
+    <div class="ct-row-1">
+        <span class="brand-name">LiveGig</span>
+
+        <div class="beat-dots">
+            <div id="beat_1" class="beat-dot"><span>1</span></div>
+            <div id="beat_2" class="beat-dot"><span>2</span></div>
+            <div id="beat_3" class="beat-dot"><span>3</span></div>
+            <div id="beat_4" class="beat-dot"><span>4</span></div>
+        </div>
+
+        <div id="ct-bpm" class="ct-bpm-display">-- BPM</div>
+
+        <div id="ct-song" class="ct-song-display">--</div>
+
+        <button class="btn btn-danger btn-sm px-3 fw-bold" onclick="ctStart()">
+            <i class="bi bi-play-fill"></i> START
+        </button>
+        <button class="btn btn-outline-secondary btn-sm px-3" onclick="ctStop()">
+            <i class="bi bi-stop-fill"></i> STOP
+        </button>
+
+        <div class="ct-toggles">
+            <label class="ct-toggle-label">
+                <input type="checkbox" id="ct-automode" checked onchange="ctToggleAuto()">
+                <span>Auto</span>
+            </label>
+            <label class="ct-toggle-label">
+                <input type="checkbox" id="ct-soundmode" onchange="ctToggleSound()">
+                <span>Sound</span>
+            </label>
+        </div>
+
+        <?php if ($user && $user['band_id']): ?>
+        <div class="dropdown ms-auto">
+            <button class="btn btn-outline-light btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-music-note-list"></i> <span id="ct-setlist-label">Setlist</span>
+            </button>
+            <ul id="setlist-dropdown" class="dropdown-menu dropdown-menu-dark">
+                <li><a class="dropdown-item text-muted" href="#">Laden...</a></li>
+            </ul>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- ROW 2: Navigation -->
+    <?php if ($user): ?>
+    <div class="ct-row-2">
+        <div class="ct-nav-links">
+            <a href="dashboard.php" class="ct-nav-link <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">
+                <i class="bi bi-house-fill"></i> Dashboard
+            </a>
+            <a href="songs.php" class="ct-nav-link <?= $currentPage === 'songs.php' ? 'active' : '' ?>">
+                <i class="bi bi-music-note-beamed"></i> Nummers
+            </a>
+            <a href="setlists.php" class="ct-nav-link <?= $currentPage === 'setlists.php' ? 'active' : '' ?>">
+                <i class="bi bi-list-ol"></i> Setlists
+            </a>
+            <a href="bands.php" class="ct-nav-link <?= $currentPage === 'bands.php' ? 'active' : '' ?>">
+                <i class="bi bi-people-fill"></i> Bands
+            </a>
+            <?php if ($user['role'] === 'admin'): ?>
+            <a href="admin.php" class="ct-nav-link ct-nav-admin <?= $currentPage === 'admin.php' ? 'active' : '' ?>">
+                <i class="bi bi-shield-fill"></i> Admin
+            </a>
+            <?php endif; ?>
+        </div>
+
+        <div class="ct-nav-right">
+            <!-- Band -->
+            <?php if (count($activeBands) > 1): ?>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-people-fill"></i> <?= htmlspecialchars($user['band_name'] ?? 'Band') ?>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+                    <?php foreach ($activeBands as $b): ?>
+                    <li>
+                        <a class="dropdown-item <?= $b['id'] == $user['band_id'] ? 'active' : '' ?>"
+                           href="api/switch-band.php?band_id=<?= $b['id'] ?>&redirect=<?= urlencode($_SERVER['REQUEST_URI']) ?>">
+                            <?= htmlspecialchars($b['name']) ?>
+                        </a>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <?php elseif ($user['band_name']): ?>
+            <span class="ct-band-name"><i class="bi bi-people-fill"></i> <?= htmlspecialchars($user['band_name']) ?></span>
+            <?php else: ?>
+            <span class="ct-band-name text-warning"><i class="bi bi-exclamation-triangle"></i> Geen band</span>
+            <?php endif; ?>
+
+            <!-- User -->
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-person-circle"></i> <?= htmlspecialchars($user['username']) ?>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+                    <li><h6 class="dropdown-header"><?= htmlspecialchars($user['username']) ?></h6></li>
+                    <li><span class="dropdown-item-text text-muted small">
+                        Rol: <?= $user['role'] ?>
+                        <?php if ($user['band_name']): ?> · <?= htmlspecialchars($user['band_name']) ?><?php endif; ?>
+                    </span></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="profile.php"><i class="bi bi-person-gear me-2"></i>Profiel &amp; beveiliging</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="logout.php"><i class="bi bi-box-arrow-right me-2"></i>Uitloggen</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+</nav>
+
+<!-- Dynamic padding spacer — JS sets height to match nav -->
+<div id="nav-spacer"></div>
+<script>
+(function() {
+    function adjustPadding() {
+        var nav = document.getElementById('clicktrack-nav');
+        var spacer = document.getElementById('nav-spacer');
+        if (nav && spacer) {
+            var h = nav.offsetHeight;
+            spacer.style.height = h + 'px';
+            document.documentElement.style.setProperty('--nav-h', h + 'px');
+        }
+    }
+    document.addEventListener('DOMContentLoaded', adjustPadding);
+    window.addEventListener('resize', adjustPadding);
+    adjustPadding();
+})();
+</script>
+
+<div id="page-content">

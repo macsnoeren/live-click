@@ -1,0 +1,180 @@
+/* LiveGig Click Track Engine */
+var _ct = {
+    bpm: 80,
+    running: false,
+    counter: 0,
+    tsPrev: 0,
+    autoStop: 25,
+    autoEnabled: true,
+    soundEnabled: false,
+    autoTimer: null,
+    numBeats: 4,
+};
+
+// Audio
+var _audioCtx = null;
+var _audioBuffer = null;
+
+function ctInitAudio() {
+    if (_audioCtx) return;
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var src = 'https://storage.googleapis.com/absolute-bot-264323/audio/DB90_Samples/QuarterNote-loudest.mp3';
+    fetch(src)
+        .then(function(r){ return r.arrayBuffer(); })
+        .then(function(buf){ return _audioCtx.decodeAudioData(buf); })
+        .then(function(decoded){ _audioBuffer = decoded; })
+        .catch(function(){ console.warn('Click sound load failed'); });
+}
+
+function ctPlayClick() {
+    if (!_audioCtx || !_audioBuffer) return;
+    var src = _audioCtx.createBufferSource();
+    src.buffer = _audioBuffer;
+    src.connect(_audioCtx.destination);
+    src.start(0);
+}
+
+function ctStart(bpm) {
+    ctInitAudio();
+    if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume();
+    if (bpm) _ct.bpm = parseInt(bpm, 10);
+    if (_ct.running) return;
+    _ct.running = true;
+    _ct.counter = 0;
+    _ct.tsPrev = 0;
+    ctUpdateBpmDisplay();
+
+    if (_ct.autoEnabled) {
+        _ct.autoTimer = setTimeout(ctStop, _ct.autoStop * 1000);
+    }
+    ctTick();
+}
+
+function ctStop() {
+    _ct.running = false;
+    _ct.counter = 0;
+    _ct.tsPrev = 0;
+    if (_ct.autoTimer) { clearTimeout(_ct.autoTimer); _ct.autoTimer = null; }
+    ctResetDots();
+    document.getElementById('ct-bpm').textContent = '-- BPM';
+}
+
+function ctTick() {
+    if (!_ct.running) return;
+    var ts = performance.now();
+    var interval = 60000 / _ct.bpm;
+
+    if (_ct.tsPrev === 0 || (ts - _ct.tsPrev) > interval - 20) {
+        while (performance.now() - _ct.tsPrev < interval) { /* spin */ }
+        ts = performance.now();
+
+        ctResetDots();
+        ctLightDot(_ct.counter);
+        if (_ct.soundEnabled) ctPlayClick();
+        _ct.counter = (_ct.counter + 1) % _ct.numBeats;
+        _ct.tsPrev = ts;
+    }
+    setTimeout(ctTick, 0);
+}
+
+function ctResetDots() {
+    for (var i = 1; i <= 4; i++) {
+        var d = document.getElementById('beat_' + i);
+        if (d) d.classList.remove('lit');
+    }
+}
+
+function ctLightDot(idx) {
+    var d = document.getElementById('beat_' + (idx + 1));
+    if (d) d.classList.add('lit');
+}
+
+function ctUpdateBpmDisplay() {
+    var el = document.getElementById('ct-bpm');
+    if (el) el.textContent = _ct.bpm + ' BPM';
+}
+
+function ctToggleAuto() {
+    _ct.autoEnabled = document.getElementById('ct-automode').checked;
+}
+
+function ctToggleSound() {
+    _ct.soundEnabled = document.getElementById('ct-soundmode').checked;
+    if (_ct.soundEnabled) ctInitAudio();
+}
+
+// Called from song list clicks
+function selectSong(song) {
+    _ct.bpm = parseInt(song.bpm, 10) || _ct.bpm;
+
+    // Update header song name
+    var songEl = document.getElementById('ct-song');
+    if (songEl) songEl.textContent = song.title + ' — ' + song.artist;
+
+    // Update detail card
+    var card = document.getElementById('song-detail-card');
+    if (card) {
+        card.style.display = '';
+
+        document.getElementById('detail-title').textContent  = song.title;
+        document.getElementById('detail-artist').textContent = song.artist;
+        document.getElementById('detail-bpm').textContent    = song.bpm || '--';
+
+        // Starts + duration row
+        var startsWrap = document.getElementById('detail-starts-wrap');
+        var startsEl   = document.getElementById('detail-starts');
+        var durEl      = document.getElementById('detail-duration');
+        if (song.starts || song.duration) {
+            startsEl.textContent = song.starts || '';
+            durEl.textContent    = song.duration || '';
+            startsWrap.style.display = '';
+        } else {
+            startsWrap.style.display = 'none';
+        }
+
+        // Description / notes
+        var descEl = document.getElementById('detail-desc');
+        if (song.description && song.description.trim()) {
+            descEl.textContent    = song.description; // textContent keeps it safe
+            descEl.style.display  = '';
+        } else {
+            descEl.style.display  = 'none';
+        }
+
+        // Drum structure SVG
+        var drumDiv = document.getElementById('detail-drum');
+        if (drumDiv) {
+            drumDiv.innerHTML    = '';
+            drumDiv.style.display = 'none';
+            if (song.drum_notation) {
+                $.ajax({
+                    url: 'api/drum_preview.php', type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({notation: song.drum_notation}),
+                    dataType: 'json',
+                    success: function(r) {
+                        if (r.ok && r.svg) {
+                            drumDiv.innerHTML    = r.svg;
+                            drumDiv.style.display = '';
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    // Restart click track at new BPM if already running
+    if (_ct.running) {
+        ctStop();
+        setTimeout(function(){ ctStart(song.bpm); }, 100);
+    } else {
+        ctUpdateBpmDisplay();
+    }
+
+    // Highlight in setlist
+    document.querySelectorAll('#setlist-songs .list-group-item').forEach(function(el) {
+        el.classList.remove('selected');
+    });
+    var active = document.querySelector('#setlist-songs [data-id="' + song.id + '"]');
+    if (active) active.classList.add('selected');
+}

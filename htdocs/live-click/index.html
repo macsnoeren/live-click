@@ -1,0 +1,79 @@
+<!--
+This file is part of Blast! software for live gig performances, called BlastLive.
+
+BlastLive is free software: you can redistribute it and/or modify it under the terms
+of the GNU General Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+BlastLive is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with Foobar. 
+If not, see <https://www.gnu.org/licenses/>.
+
+Author Maurice Snoeren (drummer of Blast!)
+-->
+<!doctype html>
+<html>
+    <head>
+        <title>Blast! - Live</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+        <link href="app.css" type="text/css" rel="stylesheet">
+    </head>
+
+    <body>
+        <nav class="navbar fixed-top bg-dark border-bottom border-body">
+            <div class="container">
+                <div id="clicktrack-bar">
+                    <div id="clicktrack_1" class="dot"><p>1</p></div>
+                    <div id="clicktrack_2" class="dot"><p>2</p></div>
+                    <div id="clicktrack_3" class="dot"><p>3</p></div>
+                    <div id="clicktrack_4" class="dot"><p>4</p></div>
+                    <div id="clicktrack_5" class="dot d-none"><p>5</p></div>
+                    <div id="clicktrack_6" class="dot d-none"><p>6</p></div>
+                    <div id="clicktrack_7" class="dot d-none"><p>7</p></div>
+                    <div id="clicktrack_8" class="dot d-none"><p>8</p></div>
+                    <div id="clicktrack_bpm" class="bpm text-light">--</div>
+                    <button type="button" class="btn btn-primary btn-lg" onclick="startClickTrack(_bpm)">START</button>
+                    <button type="button" class="btn btn-danger btn-lg" onclick="stopClickTrack()">STOP</button>
+                    <span class="dropdown">
+                        <a class="btn btn-secondary dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
+                            Available lists
+                        </a>
+                        <ul id="availablelists" class="dropdown-menu" aria-labelledby="dropdownMenuLink">
+                            <li><a class="dropdown-item" href="#">--</a></li>
+                        </ul>
+                    </span>
+                    <div style="display: inline-block; vertical-align: middle;">
+                        <span class="text-light">
+                            <table><tr><td>Automode: <input id="automode" type="checkbox" onchange="toggleAutoMode();" checked></td></tr>
+                                   <tr><td>Soundmode: <input id="soundmode" type="checkbox" onchange="toggleSoundMode();"></td></tr></table>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="container">
+            <div id="songs" class="list-group">
+                --
+            </div>
+        </div>
+
+        <div class="container">
+            <div id="debug" class="text-light">DEBUG</div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+        <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+        <script src="sound.js" type="text/javascript" crossorigin="anonymous"></script>
+        <script src="app.js" type="text/javascript" crossorigin="anonymous"></script>
+        <script src="data.js" type="text/javascript" crossorigin="anonymous"></script>
+        <script>
+            populateSongs(getSongs(true));
+            populateAvailableLists();
+        </script>
+    </body>
+</html>
