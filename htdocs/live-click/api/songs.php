@@ -1,5 +1,6 @@
-<?php
-require_once __DIR__ . '/../includes/auth.php';
+﻿<?php
+require_once __DIR__ . '/../bootstrap.php';
+require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
 header('Content-Type: application/json');
 
@@ -40,7 +41,7 @@ if ($method === 'POST') {
     $drumSvg = null;
     $drumSvgUpdatedAt = null;
     if ($drumNotation !== null) {
-        require_once __DIR__ . '/../includes/DrumSvg.php';
+        require_once APP_ROOT . '/includes/DrumSvg.php';
         $drumSvg = DrumSvg::render($drumNotation) ?: null;
         $drumSvgUpdatedAt = date('Y-m-d H:i:s');
     }

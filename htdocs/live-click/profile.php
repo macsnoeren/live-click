@@ -1,5 +1,6 @@
-<?php
-require_once __DIR__ . '/includes/auth.php';
+﻿<?php
+require_once __DIR__ . '/bootstrap.php';
+require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
 $user      = currentUser();
 $db        = getDB();
@@ -8,7 +9,7 @@ $row->execute([$user['id']]);
 $totpEnabled = (bool)($row->fetchColumn() ?: 0);
 
 $pageTitle = 'Profiel — LiveGig';
-require __DIR__ . '/includes/header.php';
+require APP_ROOT . '/includes/header.php';
 ?>
 
 <div class="container" style="max-width:560px;padding-top:1.5rem;padding-bottom:2rem">
@@ -226,5 +227,5 @@ function disable2fa() {
     });
 }
 </script>';
-require __DIR__ . '/includes/footer.php';
+require APP_ROOT . '/includes/footer.php';
 ?>

@@ -1,6 +1,7 @@
-<?php
-require_once __DIR__ . '/includes/auth.php';
-require_once __DIR__ . '/includes/db.php';
+﻿<?php
+require_once __DIR__ . '/bootstrap.php';
+require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/db.php';
 sessionStart();
 if (currentUser()) { header('Location: dashboard.php'); exit; }
 

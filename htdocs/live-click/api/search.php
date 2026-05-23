@@ -1,6 +1,7 @@
-<?php
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/config.php';
+﻿<?php
+require_once __DIR__ . '/../bootstrap.php';
+require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/config.php';
 requireLogin();
 header('Content-Type: application/json');
 

@@ -1,9 +1,10 @@
-<?php
-require_once __DIR__ . '/includes/auth.php';
+﻿<?php
+require_once __DIR__ . '/bootstrap.php';
+require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
 $user = currentUser();
 $pageTitle = 'Dashboard — LiveGig';
-require __DIR__ . '/includes/header.php';
+require APP_ROOT . '/includes/header.php';
 ?>
 <script>document.body.classList.add('page-dashboard');</script>
 
@@ -96,5 +97,5 @@ $(function() {
     $("#song-search").on("input", function() { filterSongs($(this).val()); });
 });
 </script>';
-require __DIR__ . '/includes/footer.php';
+require APP_ROOT . '/includes/footer.php';
 ?>

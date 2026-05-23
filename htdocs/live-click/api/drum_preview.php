@@ -1,5 +1,6 @@
-<?php
-require_once __DIR__ . '/../includes/auth.php';
+﻿<?php
+require_once __DIR__ . '/../bootstrap.php';
+require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
 header('Content-Type: application/json');
 
@@ -9,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-require_once __DIR__ . '/../includes/DrumSvg.php';
+require_once APP_ROOT . '/includes/DrumSvg.php';
 
 $data     = json_decode(file_get_contents('php://input'), true) ?: [];
 $notation = trim($data['notation'] ?? '');

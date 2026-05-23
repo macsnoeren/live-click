@@ -1,9 +1,10 @@
-<?php
-require_once __DIR__ . '/includes/auth.php';
+﻿<?php
+require_once __DIR__ . '/bootstrap.php';
+require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
 $user = currentUser();
 $pageTitle = 'Nummers — LiveGig';
-require __DIR__ . '/includes/header.php';
+require APP_ROOT . '/includes/header.php';
 ?>
 
 <div class="container-fluid px-3 py-3">
@@ -61,7 +62,7 @@ require __DIR__ . '/includes/header.php';
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <label class="form-label small text-muted mb-0">Zoek nummer online</label>
                         <?php
-                        require_once __DIR__ . '/includes/config.php';
+                        require_once APP_ROOT . '/includes/config.php';
                         if (SPOTIFY_CLIENT_ID): ?>
                         <span class="badge bg-success" title="Spotify API — BPM beschikbaar">
                             <i class="bi bi-spotify"></i> Spotify + BPM
@@ -569,5 +570,5 @@ function toggleTablePreview(i) {
 // Stop audio/embed when modal closes
 document.getElementById("songModal").addEventListener("hidden.bs.modal", stopPreview);
 </script>';
-require __DIR__ . '/includes/footer.php';
+require APP_ROOT . '/includes/footer.php';
 ?>

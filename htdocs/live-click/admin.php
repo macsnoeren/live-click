@@ -1,9 +1,10 @@
-<?php
-require_once __DIR__ . '/includes/auth.php';
+﻿<?php
+require_once __DIR__ . '/bootstrap.php';
+require_once APP_ROOT . '/includes/auth.php';
 requireAdmin();
 $user = currentUser();
 $pageTitle = 'Admin — LiveGig';
-require __DIR__ . '/includes/header.php';
+require APP_ROOT . '/includes/header.php';
 ?>
 
 <div class="container-fluid px-3 py-3">
@@ -270,5 +271,5 @@ function saveBand() {
     }, "json");
 }
 </script>';
-require __DIR__ . '/includes/footer.php';
+require APP_ROOT . '/includes/footer.php';
 ?>

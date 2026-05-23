@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Import songs from data.js into the database.
  * Admin only. Run via browser: /import.php
@@ -7,12 +7,14 @@
 
 $cli = (php_sapi_name() === 'cli');
 
+require_once __DIR__ . '/bootstrap.php';
+
 if (!$cli) {
-    require_once __DIR__ . '/includes/auth.php';
+    require_once APP_ROOT . '/includes/auth.php';
     requireAdmin();
     $user = currentUser();
 } else {
-    require_once __DIR__ . '/includes/db.php';
+    require_once APP_ROOT . '/includes/db.php';
     $user = ['id' => 1];
 }
 
@@ -180,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$parseError) {
 $bands = $db->query('SELECT id, name FROM bands ORDER BY name')->fetchAll();
 
 $pageTitle = 'Import data.js — LiveGig';
-require __DIR__ . '/includes/header.php';
+require APP_ROOT . '/includes/header.php';
 ?>
 
 <div class="container py-4" style="max-width:800px">
@@ -271,4 +273,4 @@ require __DIR__ . '/includes/header.php';
     <?php endif; ?>
 </div>
 
-<?php require __DIR__ . '/includes/footer.php'; ?>
+<?php require APP_ROOT . '/includes/footer.php'; ?>
