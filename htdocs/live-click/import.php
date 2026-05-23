@@ -30,7 +30,9 @@ function parseSongsFromDataJs(string $path): array|string {
     if (!preg_match('/var\s+_songs\s*=\s*(\[.*?\]);/s', $content, $m)) {
         return 'Kan _songs array niet vinden in data.js.';
     }
-    $songs = json_decode($m[1], true);
+    // JS staat trailing commas toe, JSON niet — verwijder ze voor json_decode().
+    $json = preg_replace('/,\s*([\]}])/s', '$1', $m[1]);
+    $songs = json_decode($json, true);
     if (!is_array($songs)) return 'JSON-fout: ' . json_last_error_msg();
     return $songs;
 }
