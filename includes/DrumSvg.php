@@ -21,13 +21,14 @@ require_once __DIR__ . '/DrumParser.php';
  */
 class DrumSvg {
     // ── Layout ──────────────────────────────────────────────────────────────
-    const LABEL_W = 85;   // px — left label column
-    const STEP    = 20;   // px — between consecutive bar lines within a group
-    const GAP     = 48;   // px — between last bar of group N and first of group N+1
-    const ROW_H   = 46;   // px — height per section row
-    const ROW_GAP = 8;    // px — vertical gap between rows
-    const PAD_X   = 16;   // px — right padding
-    const PAD_Y   = 8;    // px — top / bottom padding
+    const LABEL_W    = 85;   // px — left label column
+    const STEP       = 20;   // px — between consecutive bar lines within a group
+    const GAP        = 48;   // px — between last bar of group N and first of group N+1
+    const ROW_H      = 46;   // px — height per section row
+    const ROW_GAP    = 8;    // px — vertical gap between rows
+    const PAD_X      = 16;   // px — right padding
+    const PAD_Y      = 8;    // px — top / bottom padding
+    const MAX_LINE_W = 560;  // px — max total SVG width; wider sections wrap to next line
 
     // ── Vertical positions within a row (relative to row top) ───────────────
     const ANNOT_Y = 10;   // y-centre of annotation zone
@@ -52,17 +53,22 @@ class DrumSvg {
         $sections = DrumParser::parse($notation);
         if (empty($sections)) return '';
 
-        $maxSpan = 0;
+        // Wrap elke sectie in sub-rows zodat de SVG verticaal smal blijft
+        $rows   = [];
+        $maxW   = 0;
         foreach ($sections as $sec) {
-            $s = self::contentSpan($sec['groups']);
-            if (!empty($sec['comment'])) {
-                $s += self::COMMENT_GAP + (int)ceil(strlen($sec['comment']) * self::COMMENT_CHAR_W);
+            foreach (self::wrapSection($sec) as $row) {
+                $w = self::LABEL_W + self::contentSpan($row['groups']) + self::PAD_X;
+                if (!empty($row['comment'])) {
+                    $w += self::COMMENT_GAP + (int)ceil(strlen($row['comment']) * self::COMMENT_CHAR_W);
+                }
+                if ($w > $maxW) $maxW = $w;
+                $rows[] = $row;
             }
-            if ($s > $maxSpan) $maxSpan = $s;
         }
 
-        $totalW = self::LABEL_W + $maxSpan + self::PAD_X;
-        $n      = count($sections);
+        $totalW = $maxW;
+        $n      = count($rows);
         $totalH = self::PAD_Y * 2 + $n * self::ROW_H + ($n - 1) * self::ROW_GAP;
 
         $o  = '<svg xmlns="http://www.w3.org/2000/svg"';
@@ -70,13 +76,50 @@ class DrumSvg {
         $o .= ' style="display:block;width:100%;max-width:' . $totalW . 'px;height:auto">';
 
         $ry = self::PAD_Y;
-        foreach ($sections as $sec) {
-            $o  .= self::renderRow($sec, $ry);
+        foreach ($rows as $row) {
+            $o  .= self::renderRow($row, $ry);
             $ry += self::ROW_H + self::ROW_GAP;
         }
 
         $o .= '</svg>';
         return $o;
+    }
+
+    /**
+     * Splits a section into sub-rows die elk passen binnen MAX_LINE_W.
+     * Gesplitst wordt alleen op groepsgrenzen — nooit binnen een groep.
+     *
+     * @return array[]  [['label'=>string, 'groups'=>[[...]], 'comment'=>string], ...]
+     */
+    private static function wrapSection(array $sec): array {
+        $label   = $sec['label']   ?? '';
+        $groups  = $sec['groups']  ?? [];
+        $comment = $sec['comment'] ?? '';
+
+        $maxContent = self::MAX_LINE_W - self::LABEL_W - self::PAD_X;
+
+        $rows    = [];
+        $current = [];
+        $first   = true;
+
+        foreach ($groups as $group) {
+            $test = array_merge($current, [$group]);
+            // Wrap wanneer span de maximale breedte overschrijdt én er al iets staat
+            if (!empty($current) && self::contentSpan($test) > $maxContent) {
+                $rows[]  = ['label' => $first ? $label : '', 'groups' => $current, 'comment' => ''];
+                $first   = false;
+                $current = [$group];
+            } else {
+                $current = $test;
+            }
+        }
+
+        // Laatste (of enige) sub-row krijgt de comment
+        if (!empty($current)) {
+            $rows[] = ['label' => $first ? $label : '', 'groups' => $current, 'comment' => $comment];
+        }
+
+        return $rows ?: [['label' => $label, 'groups' => [], 'comment' => $comment]];
     }
 
     // ── Private ──────────────────────────────────────────────────────────────
