@@ -394,6 +394,31 @@ html, body { background-color: var(--bg); color: #e0e0e0; min-height: 100vh; }
 #song-detail-card { border-left: 3px solid var(--accent) !important; }
 
 /* =========================================
+   Inklapbare drumstructuur
+   ========================================= */
+.drum-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 5px;
+    color: #666;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 5px 9px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    text-align: left;
+}
+.drum-toggle-btn:hover         { background: #1c1c1c; color: #bbb; }
+.drum-toggle-btn.open          { border-radius: 5px 5px 0 0; border-bottom-color: transparent; }
+.drum-toggle-btn .bi           { font-size: 0.8rem; transition: transform 0.15s; }
+
+/* =========================================
    Music search results (songs modal)
    ========================================= */
 .search-loading {

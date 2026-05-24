@@ -68,8 +68,14 @@ require APP_ROOT . '/includes/header.php';
                 <!-- Notes / description -->
                 <div id="detail-desc" class="mt-2" style="display:none;font-size:0.82rem;color:#ccc;white-space:pre-wrap;border-left:2px solid #333;padding-left:8px"></div>
 
-                <!-- Drum structure SVG -->
-                <div id="detail-drum" class="mt-2" style="display:none;background:#0b0b0b;border:1px solid #222;border-radius:5px;padding:8px 6px"></div>
+                <!-- Drum structure SVG (inklapbaar) -->
+                <div id="detail-drum-wrap" class="mt-2" style="display:none">
+                    <button type="button" id="detail-drum-toggle" class="drum-toggle-btn" onclick="toggleDrumSection()">
+                        <i class="bi bi-chevron-right" id="detail-drum-chevron"></i>
+                        <span>Drumstructuur</span>
+                    </button>
+                    <div id="detail-drum" style="display:none;background:#0b0b0b;border:1px solid #222;border-top:none;border-radius:0 0 5px 5px;padding:8px 6px;overflow-x:auto"></div>
+                </div>
 
             </div>
         </div>

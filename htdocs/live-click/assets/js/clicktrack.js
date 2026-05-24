@@ -141,11 +141,18 @@ function selectSong(song) {
             descEl.style.display  = 'none';
         }
 
-        // Drum structure SVG
-        var drumDiv = document.getElementById('detail-drum');
+        // Drum structure SVG (inklapbaar)
+        var drumWrap    = document.getElementById('detail-drum-wrap');
+        var drumDiv     = document.getElementById('detail-drum');
+        var drumChevron = document.getElementById('detail-drum-chevron');
         if (drumDiv) {
-            drumDiv.innerHTML    = '';
+            drumDiv.innerHTML     = '';
             drumDiv.style.display = 'none';
+            if (drumWrap)    drumWrap.style.display = 'none';
+            if (drumChevron) { drumChevron.className = 'bi bi-chevron-right'; }
+            var toggleBtn = document.getElementById('detail-drum-toggle');
+            if (toggleBtn)   toggleBtn.classList.remove('open');
+
             if (song.drum_notation) {
                 $.ajax({
                     url: 'api/drum_preview.php', type: 'POST',
@@ -154,8 +161,9 @@ function selectSong(song) {
                     dataType: 'json',
                     success: function(r) {
                         if (r.ok && r.svg) {
-                            drumDiv.innerHTML    = r.svg;
-                            drumDiv.style.display = '';
+                            drumDiv.innerHTML = r.svg;
+                            if (drumWrap) drumWrap.style.display = '';
+                            // Standaard ingeklapt — gebruiker klapt uit met de knop
                         }
                     }
                 });
@@ -173,4 +181,17 @@ function selectSong(song) {
     });
     var active = document.querySelector('#setlist-songs [data-id="' + song.id + '"]');
     if (active) active.classList.add('selected');
+}
+
+// Toggle inklapbare drumstructuur
+function toggleDrumSection() {
+    var drumDiv = document.getElementById('detail-drum');
+    var chevron = document.getElementById('detail-drum-chevron');
+    var btn     = document.getElementById('detail-drum-toggle');
+    if (!drumDiv) return;
+
+    var open = drumDiv.style.display !== 'none';
+    drumDiv.style.display = open ? 'none' : '';
+    if (chevron) chevron.className = open ? 'bi bi-chevron-right' : 'bi bi-chevron-down';
+    if (btn)     btn.classList.toggle('open', !open);
 }
