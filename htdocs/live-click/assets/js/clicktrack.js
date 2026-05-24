@@ -166,27 +166,40 @@ function selectSong(song) {
                         var svg = drumDiv.querySelector('svg');
 
                         if (svg) {
-                            // Meet beschikbare hoogte VOORDAT drumWrap zichtbaar is,
-                            // zodat de kaart nog niet door de SVG vergroot is.
-                            var rightCol  = document.querySelector('.db-col-right');
-                            var detCard   = document.getElementById('song-detail-card');
-                            var colH      = rightCol ? rightCol.clientHeight : 0;
-                            var fixedDetH = detCard  ? detCard.offsetHeight  : 0;
-                            var togH      = toggleBtn ? toggleBtn.offsetHeight : 28;
-                            var minSongs  = 80;   // garantie voor zichtbaarheid songlijst
-                            var padding   = 24;   // drumDiv-padding + gaps
-
-                            var available = colH - fixedDetH - togH - minSongs - padding;
-
                             // Natuurlijke hoogte uit data-attribuut (betrouwbaarder dan viewBox-parsing)
-                            var natH = parseInt(svg.getAttribute('data-natural-h') || '0', 10);
+                            var natH     = parseInt(svg.getAttribute('data-natural-h') || '0', 10);
+                            var isTablet = window.matchMedia('(max-width: 991.98px)').matches;
 
-                            if (natH > 0 && available > 0 && natH > available) {
-                                // Schaal de SVG zodat hij precies past — breedte volgt automatisch
-                                svg.style.height = Math.max(60, available) + 'px';
+                            if (isTablet) {
+                                // Tablet: kolom scrollt mee — gebruik gewoon de natuurlijke hoogte.
+                                // Geen beschikbare-hoogte-berekening nodig: alles is zichtbaar via scrollen.
+                                if (natH > 0) svg.style.height = natH + 'px';
+                                svg.style.width = 'auto';
+                            } else {
+                                // Desktop: rechterkolom heeft vaste hoogte (geen scroll).
+                                // Meet beschikbare hoogte VOORDAT drumWrap zichtbaar is,
+                                // zodat de kaart nog niet door de SVG vergroot is.
+                                var navH      = parseInt(getComputedStyle(document.documentElement)
+                                                    .getPropertyValue('--nav-h')) || 0;
+                                var rightCol  = document.querySelector('.db-col-right');
+                                var detCard   = document.getElementById('song-detail-card');
+                                var colH      = rightCol ? rightCol.clientHeight : (window.innerHeight - navH);
+                                var fixedDetH = detCard  ? detCard.offsetHeight  : 0;
+                                var togH      = toggleBtn ? toggleBtn.offsetHeight : 28;
+                                var minSongs  = 120; // minimaal zichtbaar gedeelte van de songlijst
+                                var padding   = 40;  // gaps + drumDiv-padding + kaartborders
+
+                                var available = colH - fixedDetH - togH - minSongs - padding;
+
+                                if (natH > 0 && available > 0 && natH > available) {
+                                    // Schaal de SVG zodat hij precies in de beschikbare ruimte past
+                                    svg.style.height = Math.max(60, available) + 'px';
+                                } else if (natH > 0) {
+                                    // Genoeg ruimte: gebruik de natuurlijke hoogte
+                                    svg.style.height = natH + 'px';
+                                }
+                                svg.style.width = 'auto';
                             }
-                            // Breedte altijd op auto: past zich aan aan de (eventueel geschaalde) hoogte
-                            svg.style.width = 'auto';
                         }
 
                         // Toon geopend
