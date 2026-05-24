@@ -66,10 +66,8 @@ class DrumSvg {
         $totalH = self::PAD_Y * 2 + $n * self::ROW_H + ($n - 1) * self::ROW_GAP;
 
         $o  = '<svg xmlns="http://www.w3.org/2000/svg"';
-        $o .= ' width="'   . $totalW . '"';
-        $o .= ' height="'  . $totalH . '"';
         $o .= ' viewBox="0 0 ' . $totalW . ' ' . $totalH . '"';
-        $o .= ' style="display:block">';
+        $o .= ' style="display:block;width:100%;max-width:' . $totalW . 'px;height:auto">';
 
         $ry = self::PAD_Y;
         foreach ($sections as $sec) {

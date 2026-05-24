@@ -69,7 +69,7 @@ require APP_ROOT . '/includes/header.php';
                 <div id="detail-desc" class="mt-2" style="display:none;font-size:0.82rem;color:#ccc;white-space:pre-wrap;border-left:2px solid #333;padding-left:8px"></div>
 
                 <!-- Drum structure SVG -->
-                <div id="detail-drum" class="mt-2" style="display:none;overflow-x:auto;background:#0b0b0b;border:1px solid #222;border-radius:5px;padding:8px 6px"></div>
+                <div id="detail-drum" class="mt-2" style="display:none;background:#0b0b0b;border:1px solid #222;border-radius:5px;padding:8px 6px"></div>
 
             </div>
         </div>
