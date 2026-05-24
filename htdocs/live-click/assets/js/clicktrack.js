@@ -141,16 +141,17 @@ function selectSong(song) {
             descEl.style.display  = 'none';
         }
 
-        // Drum structure SVG (inklapbaar)
+        // Drum structure SVG (inklapbaar, standaard geopend)
         var drumWrap    = document.getElementById('detail-drum-wrap');
         var drumDiv     = document.getElementById('detail-drum');
         var drumChevron = document.getElementById('detail-drum-chevron');
+        var toggleBtn   = document.getElementById('detail-drum-toggle');
         if (drumDiv) {
+            // Reset naar verborgen zodat meting van de kaart klopt
             drumDiv.innerHTML     = '';
             drumDiv.style.display = 'none';
-            if (drumWrap)    drumWrap.style.display = 'none';
-            if (drumChevron) { drumChevron.className = 'bi bi-chevron-right'; }
-            var toggleBtn = document.getElementById('detail-drum-toggle');
+            if (drumWrap)    drumWrap.style.display  = 'none';
+            if (drumChevron) drumChevron.className   = 'bi bi-chevron-right';
             if (toggleBtn)   toggleBtn.classList.remove('open');
 
             if (song.drum_notation) {
@@ -160,11 +161,39 @@ function selectSong(song) {
                     data: JSON.stringify({notation: song.drum_notation}),
                     dataType: 'json',
                     success: function(r) {
-                        if (r.ok && r.svg) {
-                            drumDiv.innerHTML = r.svg;
-                            if (drumWrap) drumWrap.style.display = '';
-                            // Standaard ingeklapt — gebruiker klapt uit met de knop
+                        if (!r.ok || !r.svg) return;
+                        drumDiv.innerHTML = r.svg;
+                        var svg = drumDiv.querySelector('svg');
+
+                        if (svg) {
+                            // Meet beschikbare hoogte VOORDAT drumWrap zichtbaar is,
+                            // zodat de kaart nog niet door de SVG vergroot is.
+                            var rightCol  = document.querySelector('.db-col-right');
+                            var detCard   = document.getElementById('song-detail-card');
+                            var colH      = rightCol ? rightCol.clientHeight : 0;
+                            var fixedDetH = detCard  ? detCard.offsetHeight  : 0;
+                            var togH      = toggleBtn ? toggleBtn.offsetHeight : 28;
+                            var minSongs  = 80;   // garantie voor zichtbaarheid songlijst
+                            var padding   = 24;   // drumDiv-padding + gaps
+
+                            var available = colH - fixedDetH - togH - minSongs - padding;
+
+                            // Natuurlijke hoogte uit data-attribuut (betrouwbaarder dan viewBox-parsing)
+                            var natH = parseInt(svg.getAttribute('data-natural-h') || '0', 10);
+
+                            if (natH > 0 && available > 0 && natH > available) {
+                                // Schaal de SVG zodat hij precies past — breedte volgt automatisch
+                                svg.style.height = Math.max(60, available) + 'px';
+                            }
+                            // Breedte altijd op auto: past zich aan aan de (eventueel geschaalde) hoogte
+                            svg.style.width = 'auto';
                         }
+
+                        // Toon geopend
+                        drumDiv.style.display = '';
+                        if (drumWrap)    drumWrap.style.display  = '';
+                        if (drumChevron) drumChevron.className   = 'bi bi-chevron-down';
+                        if (toggleBtn)   toggleBtn.classList.add('open');
                     }
                 });
             }
