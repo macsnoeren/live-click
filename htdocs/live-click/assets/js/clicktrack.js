@@ -163,13 +163,9 @@ function selectSong(song) {
         }
     }
 
-    // Restart click track at new BPM if already running
-    if (_ct.running) {
-        ctStop();
-        setTimeout(function(){ ctStart(song.bpm); }, 100);
-    } else {
-        ctUpdateBpmDisplay();
-    }
+    // Start (of herstart) click track op het BPM van het geselecteerde nummer
+    ctStop();
+    setTimeout(function(){ ctStart(song.bpm); }, 50);
 
     // Highlight in setlist
     document.querySelectorAll('#setlist-songs .list-group-item').forEach(function(el) {
