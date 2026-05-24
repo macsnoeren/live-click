@@ -102,6 +102,8 @@ function initSchema(PDO $db): void {
     try { $db->exec('ALTER TABLE songs ADD COLUMN drum_notation TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE songs ADD COLUMN drum_svg TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE songs ADD COLUMN drum_svg_updated_at DATETIME'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE bands ADD COLUMN share_token TEXT'); } catch (PDOException $e) {}
+    try { $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_bands_share_token ON bands(share_token) WHERE share_token IS NOT NULL'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_secret TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}

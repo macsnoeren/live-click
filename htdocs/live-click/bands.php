@@ -178,6 +178,10 @@ function renderBands(bands) {
             ? \'<div class="card-footer border-secondary p-0">\'
               + \'<button class="btn btn-link btn-sm text-muted w-100 text-start px-3 py-2" onclick="toggleInvite(\' + b.id + \')"><i class="bi bi-link-45deg me-1"></i> Uitnodigingslink</button>\'
               + \'<div id="invite-\' + b.id + \'" class="px-3 pb-3" style="display:none"></div>\'
+              + \'<div class="border-top border-secondary" style="border-top-style:dashed!important">\'
+              + \'<button class="btn btn-link btn-sm text-muted w-100 text-start px-3 py-2" onclick="toggleShare(\' + b.id + \')"><i class="bi bi-eye me-1"></i> Setlijst deellink</button>\'
+              + \'<div id="share-\' + b.id + \'" class="px-3 pb-3" style="display:none"></div>\'
+              + \'</div>\'
               + \'</div>\'
             : \'\';
 
@@ -377,6 +381,81 @@ function revokeInvite(bandId) {
                 var section = $("#invite-" + bandId);
                 section.data("loaded", true);
                 renderNoInvite(bandId);
+            } else { alert(r.error || "Fout"); }
+        }
+    });
+}
+
+// ---- Setlijst deellink ----
+
+function shareUrl(token) {
+    var base = window.location.href.replace(/\/[^\/]*(\?.*)?$/, "/");
+    return base + "public.php?t=" + token;
+}
+
+function toggleShare(bandId) {
+    var section = $("#share-" + bandId);
+    if (section.is(":visible")) { section.hide(); return; }
+    section.show();
+    if (!section.data("loaded")) {
+        section.html(\'<div class="text-muted small"><i class="bi bi-hourglass-split"></i> Laden...</div>\');
+        $.get("api/share.php?band_id=" + bandId, function(r) {
+            section.data("loaded", true);
+            if (r.token) { renderShareToken(bandId, r.token); }
+            else         { renderNoShare(bandId); }
+        });
+    }
+}
+
+function renderShareToken(bandId, token) {
+    var url = shareUrl(token);
+    $("#share-" + bandId).html(
+        \'<div class="input-group input-group-sm mb-2">\'
+        + \'<input type="text" class="form-control form-control-sm" id="share-url-\' + bandId + \'" value="\' + escHtml(url) + \'" readonly onclick="this.select()">\'
+        + \'<button class="btn btn-outline-secondary btn-sm" onclick="copyShare(\' + bandId + \')" title="Kopieer"><i class="bi bi-clipboard"></i></button>\'
+        + \'</div>\'
+        + \'<div class="d-flex gap-2">\'
+        + \'<button class="btn btn-xs btn-outline-secondary" onclick="regenerateShare(\' + bandId + \')"><i class="bi bi-arrow-repeat me-1"></i>Nieuwe link</button>\'
+        + \'<button class="btn btn-xs btn-outline-danger" onclick="revokeShare(\' + bandId + \')"><i class="bi bi-trash me-1"></i>Verwijder</button>\'
+        + \'</div>\'
+    );
+}
+
+function renderNoShare(bandId) {
+    $("#share-" + bandId).html(
+        \'<p class="text-muted small mb-2">Nog geen deellink aangemaakt.</p>\'
+        + \'<button class="btn btn-xs btn-outline-secondary" onclick="regenerateShare(\' + bandId + \')"><i class="bi bi-plus-lg me-1"></i>Link aanmaken</button>\'
+    );
+}
+
+function copyShare(bandId) {
+    var input = document.getElementById("share-url-" + bandId);
+    navigator.clipboard.writeText(input.value).then(function() {
+        var btn = $(input).next("button");
+        btn.html(\'<i class="bi bi-check-lg"></i>\');
+        setTimeout(function() { btn.html(\'<i class="bi bi-clipboard"></i>\'); }, 1500);
+    }).catch(function() { input.select(); document.execCommand("copy"); });
+}
+
+function regenerateShare(bandId) {
+    $.post("api/share.php", JSON.stringify({band_id: bandId}), function(r) {
+        if (r.ok) {
+            $("#share-" + bandId).data("loaded", true);
+            renderShareToken(bandId, r.token);
+        } else { alert(r.error || "Fout"); }
+    }, "json");
+}
+
+function revokeShare(bandId) {
+    if (!confirm("Deellink verwijderen? Gasten kunnen de setlijsten dan niet meer bekijken.")) return;
+    $.ajax({ url: "api/share.php", type: "DELETE",
+        data: JSON.stringify({band_id: bandId}),
+        contentType: "application/json",
+        success: function(r) {
+            if (r.ok) {
+                var s = $("#share-" + bandId);
+                s.data("loaded", true);
+                renderNoShare(bandId);
             } else { alert(r.error || "Fout"); }
         }
     });
