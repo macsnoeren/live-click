@@ -230,6 +230,45 @@ html, body { background-color: var(--bg); color: #e0e0e0; min-height: 100vh; }
     border-left: 3px solid var(--accent);
     color: #fff;
 }
+/* Compenseer de 3px border zodat tekst niet springt bij selectie */
+.sl-item.selected { padding-left: 11px; }
+
+/* =========================================
+   Setlist-items: vinger-vriendelijke hoogte + starts-rij
+   ========================================= */
+.sl-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 52px;
+    padding: 10px 14px;
+    gap: 8px;
+}
+
+.sl-item .sl-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.sl-item .sl-title-row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.sl-item .sl-num    { color: #555; font-size: 0.8rem; flex-shrink: 0; }
+.sl-item .sl-title  { font-weight: 600; color: #e8e8e8; }
+.sl-item .sl-artist { color: #777; font-size: 0.8rem; }
+
+.sl-item .sl-starts {
+    font-size: 0.72rem;
+    color: #888;
+    padding-left: 2px;
+}
+.sl-item .sl-starts i { color: #cc4444; margin-right: 3px; }
 
 /* =========================================
    BPM badge

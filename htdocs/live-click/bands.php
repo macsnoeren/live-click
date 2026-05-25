@@ -152,9 +152,13 @@ function renderBands(bands) {
         var editBtn  = canManage
             ? \'<button class="btn btn-xs btn-outline-secondary" onclick="openEditBand(\' + i + \')" title="Bewerken"><i class="bi bi-pencil"></i></button>\'
             : \'\';
-        var leaveBtn = \'<button class="btn btn-xs btn-outline-warning ms-1" onclick="askLeave(\' + b.id + \',\\\'\' + escHtml(b.name) + \'\\\',\' + (amLeader ? "true" : "false") + \')" title="Band verlaten"><i class="bi bi-box-arrow-left"></i></button>\';
+        var leaveBtn = \'<button class="btn btn-xs btn-outline-warning ms-1"\'
+            + \' data-band-id="\' + b.id + \'" data-band-name="\' + escHtml(b.name) + \'" data-is-leader="\' + (amLeader ? "1" : "0") + \'"\'
+            + \' onclick="askLeave(this)" title="Band verlaten"><i class="bi bi-box-arrow-left"></i></button>\';
         var deleteBtn = _isAdmin
-            ? \'<button class="btn btn-xs btn-outline-danger ms-1" onclick="askDeleteBand(\' + b.id + \',\\\'\' + escHtml(b.name) + \'\\\')" title="Verwijderen"><i class="bi bi-trash"></i></button>\'
+            ? \'<button class="btn btn-xs btn-outline-danger ms-1"\'
+              + \' data-band-id="\' + b.id + \'" data-band-name="\' + escHtml(b.name) + \'"\'
+              + \' onclick="askDeleteBand(this)" title="Verwijderen"><i class="bi bi-trash"></i></button>\'
             : \'\';
 
         // Members list
@@ -164,7 +168,9 @@ function renderBands(bands) {
             var isLeader   = (m.role === "leader");
             var leaderIcon = isLeader ? \'<i class="bi bi-star-fill text-warning me-1" title="Bandleider" style="font-size:0.65rem"></i>\' : \'\';
             var removeBtn  = (!isMe && canManage)
-                ? \'<button class="btn btn-xs btn-link text-danger p-0 ms-auto" onclick="removeMember(\' + b.id + \',\' + m.id + \',\\\'\' + escHtml(m.username) + \'\\\')" title="Toegang ontzeggen"><i class="bi bi-x-lg"></i></button>\'
+                ? \'<button class="btn btn-xs btn-link text-danger p-0 ms-auto"\'
+                  + \' data-band-id="\' + b.id + \'" data-user-id="\' + m.id + \'" data-username="\' + escHtml(m.username) + \'"\'
+                  + \' onclick="removeMember(this)" title="Toegang ontzeggen"><i class="bi bi-x-lg"></i></button>\'
                 : \'\';
             membersHtml += \'<div class="d-flex align-items-center py-1 border-bottom border-secondary" style="border-bottom-style:dashed!important">\'
                 + leaderIcon
@@ -250,7 +256,10 @@ function saveBand() {
 
 // ---- Member removal ----
 
-function removeMember(bandId, userId, username) {
+function removeMember(el) {
+    var bandId   = parseInt(el.dataset.bandId,  10);
+    var userId   = parseInt(el.dataset.userId,  10);
+    var username = el.dataset.username; // browser decodeert &#39; → ' automatisch
     if (!confirm("Toegang ontzeggen aan " + username + "?")) return;
     $.ajax({ url: "api/bands.php", type: "DELETE",
         data: JSON.stringify({band_id: bandId, user_id: userId}),
@@ -264,8 +273,10 @@ function removeMember(bandId, userId, username) {
 
 // ---- Leave band ----
 
-function askLeave(bandId, name, amLeader) {
-    _leaveBandId = bandId;
+function askLeave(el) {
+    _leaveBandId = parseInt(el.dataset.bandId, 10);
+    var name     = el.dataset.bandName; // browser decodeert HTML-entities automatisch
+    var amLeader = el.dataset.isLeader === '1';
     $("#leave-band-name").text(name);
     var warning = $("#leave-leader-warning");
     if (amLeader) { warning.show(); } else { warning.hide(); }
@@ -286,8 +297,9 @@ function confirmLeave() {
 
 // ---- Delete band (admin) ----
 
-function askDeleteBand(id, name) {
-    _deleteBandId = id;
+function askDeleteBand(el) {
+    _deleteBandId = parseInt(el.dataset.bandId, 10);
+    var name      = el.dataset.bandName; // browser decodeert HTML-entities automatisch
     $("#delete-band-name").text(name);
     new bootstrap.Modal("#deleteBandModal").show();
 }

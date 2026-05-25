@@ -130,7 +130,7 @@ function renderSetlists(lists) {
             \'</div>\' +
             \'<div class="d-flex gap-1">\' +
             \'<button class="btn btn-xs btn-outline-secondary" onclick="openEditSetlist(\' + sl.id + \')"><i class="bi bi-pencil"></i></button>\' +
-            \'<button class="btn btn-xs btn-outline-danger" onclick="openDeleteSetlist(\' + sl.id + \',\\\'\' + escHtml(sl.name) + \'\\\')"><i class="bi bi-trash"></i></button>\' +
+            \'<button class="btn btn-xs btn-outline-danger" onclick="openDeleteSetlist(\' + sl.id + \',\' + slIdx + \')"><i class="bi bi-trash"></i></button>\' +
             \'</div></div>\' +
             \'<div class="list-group list-group-flush">\';
         songs.forEach(function(s, songIdx) {
@@ -262,8 +262,10 @@ function saveSetlist() {
     }, "json");
 }
 
-function openDeleteSetlist(id, name) {
+function openDeleteSetlist(id, idx) {
     _deleteSlId = id;
+    // Naam opzoeken via index — geen songnaam inline in onclick
+    var name = (_setlistsData[idx] && _setlistsData[idx].name) ? _setlistsData[idx].name : '?';
     $("#delete-sl-name").text(name);
     new bootstrap.Modal("#deleteSlModal").show();
 }

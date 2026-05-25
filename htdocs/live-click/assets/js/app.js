@@ -36,7 +36,8 @@ function escHtml(str) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 /* =========================================
@@ -292,14 +293,20 @@ function renderSetlistPanel(songs) {
         // Index elk nummer zodat selectSongById het kan vinden
         _songById[s.id] = s;
 
+        var startsRow = s.starts
+            ? '<div class="sl-starts"><i class="bi bi-play-fill"></i>' + escHtml(s.starts) + '</div>'
+            : '';
+
         c.append(
-            '<button class="list-group-item list-group-item-action list-group-item-dark' +
-            ' d-flex justify-content-between align-items-center py-2"' +
+            '<button class="list-group-item list-group-item-action list-group-item-dark sl-item"' +
             ' data-id="' + s.id + '" onclick="selectSongById(this)">' +
-            '<span>' +
-            '<span class="text-muted me-2">'   + (i + 1)          + '.</span>' +
-            '<span class="fw-semibold">'        + escHtml(s.title)  + '</span>' +
-            '<span class="text-muted small ms-2">' + escHtml(s.artist) + '</span>' +
+            '<span class="sl-main">' +
+            '<span class="sl-title-row">' +
+            '<span class="sl-num">'    + (i + 1)           + '.</span>' +
+            '<span class="sl-title">'  + escHtml(s.title)  + '</span>' +
+            '<span class="sl-artist">' + escHtml(s.artist) + '</span>' +
+            '</span>' +
+            startsRow +
             '</span>' +
             '<span class="bpm-badge">' + (s.bpm || '--') + '</span>' +
             '</button>'

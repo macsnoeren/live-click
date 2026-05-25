@@ -244,7 +244,7 @@ function renderSongsTable(songs) {
             \'<td>\' + escHtml(s.starts || "") + \'</td>\' +
             \'<td class="text-muted small">\' + escHtml(s.description || "").substring(0,60) + \'</td>\' +
             \'<td><button class="btn btn-xs btn-outline-secondary me-1" onclick="openEditSong(\' + i + \')"><i class="bi bi-pencil"></i></button>\' +
-            \'<button class="btn btn-xs btn-outline-danger" onclick="openDeleteSong(\' + s.id + \',\\\'\' + escHtml(s.title) + \'\\\')"><i class="bi bi-trash"></i></button></td>\' +
+            \'<button class="btn btn-xs btn-outline-danger" onclick="openDeleteSong(\' + s.id + \',\' + i + \')"><i class="bi bi-trash"></i></button></td>\' +
             \'</tr>\'
         );
     });
@@ -341,8 +341,10 @@ function saveSong() {
     });
 }
 
-function openDeleteSong(id, name) {
+function openDeleteSong(id, idx) {
     _deleteSongId = id;
+    // Naam opzoeken via index — geen songnaam inline in onclick nodig
+    var name = (_songsList[idx] && _songsList[idx].title) ? _songsList[idx].title : '?';
     $("#delete-name").text(name);
     new bootstrap.Modal("#deleteModal").show();
 }
