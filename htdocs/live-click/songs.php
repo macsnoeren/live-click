@@ -520,6 +520,9 @@ function stopPreview() {
     }
     _playingType = null;
     _playingIdx  = -1;
+    // Verberg eventuele foutmelding over verlopen preview-links
+    var warn = document.getElementById("table-spotify-embed");
+    if (warn && warn.querySelector(".alert")) { warn.style.display = "none"; warn.innerHTML = ""; }
 }
 
 function playWithSpotifyEmbed(spotifyId, embedContainerId, iconId) {
@@ -539,14 +542,23 @@ function toggleSearchPreview(i) {
     _playingType = \'search\';
     _playingIdx  = i;
     if (r.preview_url) {
-        // HTML5 audio if available
         $("#sr-play-" + i).removeClass("bi-play-fill").addClass("bi-stop-fill");
         _previewAudio = new Audio(r.preview_url);
         _previewAudio.volume = 0.6;
-        _previewAudio.play();
+        var p = _previewAudio.play();
+        if (p && p.catch) {
+            p.catch(function() {
+                // Preview-URL mislukt — probeer Spotify embed
+                _previewAudio = null;
+                if (r.spotify_id) {
+                    playWithSpotifyEmbed(r.spotify_id, \'spotify-embed-container\', \'sr-play-\' + i);
+                } else {
+                    stopPreview();
+                }
+            });
+        }
         _previewAudio.onended = stopPreview;
     } else {
-        // Spotify embed fallback
         playWithSpotifyEmbed(r.spotify_id, \'spotify-embed-container\', \'sr-play-\' + i);
     }
 }
@@ -562,7 +574,21 @@ function toggleTablePreview(i) {
         $("#play-icon-" + i).removeClass("bi-play-fill").addClass("bi-stop-fill");
         _previewAudio = new Audio(s.preview_url);
         _previewAudio.volume = 0.6;
-        _previewAudio.play();
+        var p = _previewAudio.play();
+        if (p && p.catch) {
+            p.catch(function() {
+                // Preview-URL verlopen of onbereikbaar — probeer Spotify embed
+                _previewAudio = null;
+                if (s.spotify_id) {
+                    playWithSpotifyEmbed(s.spotify_id, \'table-spotify-embed\', \'play-icon-\' + i);
+                } else {
+                    stopPreview();
+                    $("#table-spotify-embed")
+                        .html(\'<div class="alert alert-warning py-1 px-2 small mb-0"><i class="bi bi-exclamation-triangle me-1"></i>Preview-link verlopen. Bewerk het nummer en zoek het opnieuw op om een nieuwe link op te halen.</div>\')
+                        .show();
+                }
+            });
+        }
         _previewAudio.onended = stopPreview;
     } else {
         playWithSpotifyEmbed(s.spotify_id, \'table-spotify-embed\', \'play-icon-\' + i);
