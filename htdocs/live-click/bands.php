@@ -259,7 +259,7 @@ function saveBand() {
 function removeMember(el) {
     var bandId   = parseInt(el.dataset.bandId,  10);
     var userId   = parseInt(el.dataset.userId,  10);
-    var username = el.dataset.username; // browser decodeert &#39; → ' automatisch
+    var username = el.dataset.username; // browser decodeert HTML-entities automatisch
     if (!confirm("Toegang ontzeggen aan " + username + "?")) return;
     $.ajax({ url: "api/bands.php", type: "DELETE",
         data: JSON.stringify({band_id: bandId, user_id: userId}),
@@ -276,7 +276,7 @@ function removeMember(el) {
 function askLeave(el) {
     _leaveBandId = parseInt(el.dataset.bandId, 10);
     var name     = el.dataset.bandName; // browser decodeert HTML-entities automatisch
-    var amLeader = el.dataset.isLeader === '1';
+    var amLeader = el.dataset.isLeader === "1";
     $("#leave-band-name").text(name);
     var warning = $("#leave-leader-warning");
     if (amLeader) { warning.show(); } else { warning.hide(); }
