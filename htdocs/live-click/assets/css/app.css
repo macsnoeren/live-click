@@ -195,15 +195,39 @@ html, body { background-color: var(--bg); color: #e0e0e0; min-height: 100vh; }
 }
 
 .ls-usage {
-    font-size: 0.7rem;
-    color: #555;
-    white-space: nowrap;
-    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
     cursor: default;
-    transition: color 0.2s;
+    white-space: nowrap;
 }
-.ls-usage.ls-warn  { color: #a06020; }
-.ls-usage.ls-full  { color: #cc3333; }
+.ls-usage-bar {
+    width: 48px;
+    height: 4px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.ls-usage-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: #444;
+    transition: width 0.4s, background 0.4s;
+    min-width: 1px;
+}
+.ls-usage-label {
+    font-size: 0.68rem;
+    color: #555;
+    letter-spacing: 0.01em;
+    transition: color 0.3s;
+}
+/* warn > 60 % */
+.ls-usage.ls-warn .ls-usage-fill  { background: #a06020; }
+.ls-usage.ls-warn .ls-usage-label { color: #a06020; }
+/* full > 90 % */
+.ls-usage.ls-full .ls-usage-fill  { background: #cc3333; }
+.ls-usage.ls-full .ls-usage-label { color: #cc3333; }
 
 /* =========================================
    Cards

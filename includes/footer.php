@@ -9,6 +9,8 @@
 <?= $extraScripts ?? '' ?>
 <script>
 (function() {
+    var LS_MAX = 5 * 1024 * 1024; // 5 MB
+
     function updateLsUsage() {
         var el = document.getElementById('ls-usage');
         if (!el) return;
@@ -18,21 +20,33 @@
                 var k = localStorage.key(i);
                 bytes += (k.length + (localStorage.getItem(k) || '').length) * 2;
             }
-            var kb  = bytes / 1024;
-            var txt = kb < 1 ? '<1 KB' : Math.round(kb) + ' KB';
-            // Browsers typically cap localStorage at 5–10 MB; warn at 3 MB, red at 4.5 MB
-            el.textContent = txt;
-            el.title = 'Lokale cache (localStorage): ' + txt;
-            el.className = 'ls-usage' +
-                (bytes > 4718592 ? ' ls-full' : bytes > 3145728 ? ' ls-warn' : '');
+            var kb   = bytes / 1024;
+            var pct  = Math.min(100, Math.round(bytes / LS_MAX * 100));
+            var txt  = kb < 1 ? '<1 KB' : Math.round(kb) + ' KB';
+            var tip  = 'Lokale cache: ' + txt + ' van 5 MB (' + pct + '%)';
+
+            // Lazy-build inner structure once
+            var fill = el.querySelector('.ls-usage-fill');
+            var lbl  = el.querySelector('.ls-usage-label');
+            if (!fill) {
+                el.innerHTML =
+                    '<span class="ls-usage-bar"><span class="ls-usage-fill"></span></span>' +
+                    '<span class="ls-usage-label"></span>';
+                fill = el.querySelector('.ls-usage-fill');
+                lbl  = el.querySelector('.ls-usage-label');
+            }
+
+            fill.style.width = pct + '%';
+            lbl.textContent  = txt;
+            el.title         = tip;
+            el.className     = 'ls-usage' +
+                (pct >= 90 ? ' ls-full' : pct >= 60 ? ' ls-warn' : '');
         } catch (e) {
-            // Private browsing or quota exceeded — hide silently
-            el.textContent = '';
+            el.innerHTML = ''; // private browsing of quota error
         }
     }
     updateLsUsage();
     window.addEventListener('storage', updateLsUsage);
-    // Also expose so app.js can call it after a cache write
     window.updateLsUsage = updateLsUsage;
 })();
 </script>
