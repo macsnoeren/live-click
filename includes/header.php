@@ -88,6 +88,9 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         </div>
 
         <div class="ct-nav-right">
+            <!-- localStorage-gebruik -->
+            <span id="ls-usage" class="ls-usage" title="Lokale cache (localStorage)"></span>
+
             <!-- Band -->
             <?php if (count($activeBands) > 1): ?>
             <div class="dropdown">

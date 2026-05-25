@@ -54,6 +54,7 @@ function lgSave(type, bandId, data) {
         localStorage.setItem(_lgKey(type, bandId), JSON.stringify(data));
         localStorage.setItem('lg_ts_' + bandId, Date.now());
     } catch (e) { /* quota overschreden — geen actie */ }
+    if (typeof window.updateLsUsage === 'function') window.updateLsUsage();
 }
 
 function lgLoad(type, bandId) {
