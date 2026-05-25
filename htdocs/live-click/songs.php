@@ -344,7 +344,7 @@ function saveSong() {
 function openDeleteSong(id, idx) {
     _deleteSongId = id;
     // Naam opzoeken via index — geen songnaam inline in onclick nodig
-    var name = (_songsList[idx] && _songsList[idx].title) ? _songsList[idx].title : '?';
+    var name = (_songsList[idx] && _songsList[idx].title) ? _songsList[idx].title : "?";
     $("#delete-name").text(name);
     new bootstrap.Modal("#deleteModal").show();
 }

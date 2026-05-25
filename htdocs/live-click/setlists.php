@@ -265,7 +265,7 @@ function saveSetlist() {
 function openDeleteSetlist(id, idx) {
     _deleteSlId = id;
     // Naam opzoeken via index — geen songnaam inline in onclick
-    var name = (_setlistsData[idx] && _setlistsData[idx].name) ? _setlistsData[idx].name : '?';
+    var name = (_setlistsData[idx] && _setlistsData[idx].name) ? _setlistsData[idx].name : "?";
     $("#delete-sl-name").text(name);
     new bootstrap.Modal("#deleteSlModal").show();
 }
