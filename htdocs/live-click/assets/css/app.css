@@ -634,11 +634,24 @@ body.page-dashboard #page-content {
 @media (max-width: 991.98px) {
     .db-wrap {
         flex-direction: column;
-        overflow-y: auto;
+        overflow-y: auto;   /* één scroll-container voor de hele pagina */
         overflow-x: hidden;
     }
+
+    /* Setlist-kolom: geen vaste hoogte, expandeer mee met de inhoud.
+       Zo vermijden we geneste scroll-containers — de buitenste .db-wrap
+       is de enige scroller, en alle nummers zijn altijd aanraakbaar. */
     .db-col-left {
-        flex: 0 0 auto;
-        height: 35vh;
+        flex: none;
+    }
+    .db-col-left .db-card {
+        flex: none;
+        height: auto;
+    }
+    .db-col-left .db-list {
+        flex: none;
+        height: auto;
+        overflow-y: visible;   /* geen eigen scroll op tablet */
+        min-height: 0;
     }
 }
