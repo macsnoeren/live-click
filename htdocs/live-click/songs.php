@@ -503,99 +503,120 @@ function refreshDrumPreview(notation) {
     });
 }
 
-/* ---- Preview audio / Spotify embed player ---- */
-var _previewAudio   = null;
-var _playingType    = null; // \'search\' or \'table\'
-var _playingIdx     = -1;
+/* ---- Preview audio / Spotify ---- */
+var _previewAudio = null;
+var _playingType  = null; // "search" or "table"
+var _playingIdx   = -1;
 
 function stopPreview() {
     if (_previewAudio) { _previewAudio.pause(); _previewAudio = null; }
-    if (_playingType === \'search\' && _playingIdx >= 0) {
+    if (_playingType === "search" && _playingIdx >= 0) {
         $("#sr-play-" + _playingIdx).removeClass("bi-stop-fill").addClass("bi-play-fill");
         $("#spotify-embed-container").hide().empty();
     }
-    if (_playingType === \'table\' && _playingIdx >= 0) {
+    if (_playingType === "table" && _playingIdx >= 0) {
         $("#play-icon-" + _playingIdx).removeClass("bi-stop-fill").addClass("bi-play-fill");
         $("#table-spotify-embed").hide().empty();
     }
     _playingType = null;
     _playingIdx  = -1;
-    // Verberg eventuele foutmelding over verlopen preview-links
-    var warn = document.getElementById("table-spotify-embed");
-    if (warn && warn.querySelector(".alert")) { warn.style.display = "none"; warn.innerHTML = ""; }
 }
 
-function playWithSpotifyEmbed(spotifyId, embedContainerId, iconId) {
-    var url = \'https://open.spotify.com/embed/track/\' + spotifyId + \'?utm_source=generator\';
-    var iframe = \'<iframe src="\' + url + \'" width="100%" height="80" frameborder="0" \' +
-        \'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" \' +
-        \'style="border-radius:8px"></iframe>\';
-    $(\'#\' + embedContainerId).html(iframe).show();
-    $(\'#\' + iconId).removeClass("bi-play-fill").addClass("bi-stop-fill");
+/*
+ * Probeer een MP3-preview URL af te spelen.
+ * Bij mislukken: haal een verse URL op via de server (Spotify Tracks API).
+ * Als er helemaal geen preview beschikbaar is: toon een "Open in Spotify"-knop.
+ *
+ * iconSel      = jQuery-selector van het play/stop-icoon
+ * containerSel = jQuery-selector van de embed-container (voor fallback-knop)
+ * spotifyId    = Spotify track-id (mag null zijn)
+ * previewUrl   = opgeslagen URL (mag verlopen zijn)
+ */
+function _tryPlayUrl(previewUrl, spotifyId, iconSel, containerSel) {
+    function showOpenSpotify() {
+        if (spotifyId) {
+            $(containerSel).html(
+                \'<a href="https://open.spotify.com/track/\' + spotifyId + \'" target="_blank" \' +
+                \'class="btn btn-sm btn-outline-success"><i class="bi bi-spotify me-1"></i>Open in Spotify</a>\'
+            ).show();
+        }
+        stopPreview();
+    }
+
+    function playUrl(url) {
+        $(iconSel).removeClass("bi-play-fill").addClass("bi-stop-fill");
+        _previewAudio = new Audio(url);
+        _previewAudio.volume = 0.6;
+        _previewAudio.onended = stopPreview;
+        var p = _previewAudio.play();
+        if (p && p.catch) {
+            p.catch(function() {
+                _previewAudio = null;
+                // Verse URL ophalen via server
+                if (spotifyId) {
+                    $(iconSel).removeClass("bi-stop-fill").addClass("bi-play-fill");
+                    $(containerSel).html(\'<span class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>Preview laden...</span>\').show();
+                    $.get("api/preview.php", {spotify_id: spotifyId}, function(r) {
+                        if (r.preview_url) {
+                            $(containerSel).hide().empty();
+                            playUrl(r.preview_url);
+                        } else {
+                            $(containerSel).empty();
+                            showOpenSpotify();
+                        }
+                    }).fail(function() {
+                        $(containerSel).empty();
+                        showOpenSpotify();
+                    });
+                } else {
+                    showOpenSpotify();
+                }
+            });
+        }
+    }
+
+    if (previewUrl) {
+        playUrl(previewUrl);
+    } else if (spotifyId) {
+        // Geen URL opgeslagen — haal meteen een verse op
+        $(containerSel).html(\'<span class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>Preview laden...</span>\').show();
+        $.get("api/preview.php", {spotify_id: spotifyId}, function(r) {
+            $(containerSel).hide().empty();
+            if (r.preview_url) {
+                playUrl(r.preview_url);
+            } else {
+                showOpenSpotify();
+            }
+        }).fail(function() {
+            $(containerSel).empty();
+            showOpenSpotify();
+        });
+    }
 }
 
 function toggleSearchPreview(i) {
     var r = _searchResults[i];
     if (!r || (!r.preview_url && !r.spotify_id)) return;
-    if (_playingType === \'search\' && _playingIdx === i) { stopPreview(); return; }
+    if (_playingType === "search" && _playingIdx === i) { stopPreview(); return; }
     stopPreview();
-    _playingType = \'search\';
+    _playingType = "search";
     _playingIdx  = i;
-    if (r.preview_url) {
-        $("#sr-play-" + i).removeClass("bi-play-fill").addClass("bi-stop-fill");
-        _previewAudio = new Audio(r.preview_url);
-        _previewAudio.volume = 0.6;
-        var p = _previewAudio.play();
-        if (p && p.catch) {
-            p.catch(function() {
-                // Preview-URL mislukt — probeer Spotify embed
-                _previewAudio = null;
-                if (r.spotify_id) {
-                    playWithSpotifyEmbed(r.spotify_id, \'spotify-embed-container\', \'sr-play-\' + i);
-                } else {
-                    stopPreview();
-                }
-            });
-        }
-        _previewAudio.onended = stopPreview;
-    } else {
-        playWithSpotifyEmbed(r.spotify_id, \'spotify-embed-container\', \'sr-play-\' + i);
-    }
+    _tryPlayUrl(r.preview_url || null, r.spotify_id || null,
+                "#sr-play-" + i, "#spotify-embed-container");
 }
 
 function toggleTablePreview(i) {
     var s = _songsList[i];
     if (!s || (!s.preview_url && !s.spotify_id)) return;
-    if (_playingType === \'table\' && _playingIdx === i) { stopPreview(); return; }
+    if (_playingType === "table" && _playingIdx === i) { stopPreview(); return; }
     stopPreview();
-    _playingType = \'table\';
+    _playingType = "table";
     _playingIdx  = i;
-    if (s.preview_url) {
-        $("#play-icon-" + i).removeClass("bi-play-fill").addClass("bi-stop-fill");
-        _previewAudio = new Audio(s.preview_url);
-        _previewAudio.volume = 0.6;
-        var p = _previewAudio.play();
-        if (p && p.catch) {
-            p.catch(function() {
-                // Preview-URL verlopen of onbereikbaar — probeer Spotify embed
-                _previewAudio = null;
-                if (s.spotify_id) {
-                    playWithSpotifyEmbed(s.spotify_id, \'table-spotify-embed\', \'play-icon-\' + i);
-                } else {
-                    stopPreview();
-                    $("#table-spotify-embed")
-                        .html(\'<div class="alert alert-warning py-1 px-2 small mb-0"><i class="bi bi-exclamation-triangle me-1"></i>Preview-link verlopen. Bewerk het nummer en zoek het opnieuw op om een nieuwe link op te halen.</div>\')
-                        .show();
-                }
-            });
-        }
-        _previewAudio.onended = stopPreview;
-    } else {
-        playWithSpotifyEmbed(s.spotify_id, \'table-spotify-embed\', \'play-icon-\' + i);
-    }
+    _tryPlayUrl(s.preview_url || null, s.spotify_id || null,
+                "#play-icon-" + i, "#table-spotify-embed");
 }
 
-// Stop audio/embed when modal closes
+// Stop audio wanneer modal sluit
 document.getElementById("songModal").addEventListener("hidden.bs.modal", stopPreview);
 </script>';
 require APP_ROOT . '/includes/footer.php';
