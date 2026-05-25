@@ -27,7 +27,7 @@ if ($method === 'GET') {
         exit;
     }
     $bandId = (int)($_GET['band_id'] ?? 0);
-    $stmt = $db->prepare('SELECT * FROM setlists WHERE band_id=? ORDER BY created_at DESC');
+    $stmt = $db->prepare('SELECT * FROM setlists WHERE band_id=? ORDER BY name COLLATE NOCASE ASC');
     $stmt->execute([$bandId]);
     $lists = $stmt->fetchAll();
     foreach ($lists as &$sl) {

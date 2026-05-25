@@ -182,6 +182,12 @@ function filterSongs(q) {
 /* =========================================
    Dashboard: setlist dropdown
    ========================================= */
+function _sortSetlists(lists) {
+    lists.sort(function(a, b) {
+        return a.name.localeCompare(b.name, undefined, {sensitivity: 'base'});
+    });
+}
+
 function loadSetlistDropdown() {
     var bandId = typeof BAND_ID !== 'undefined' ? BAND_ID : null;
     if (!bandId) return;
@@ -189,6 +195,7 @@ function loadSetlistDropdown() {
     // Toon gecachede data meteen
     var cached = lgLoad('setlists', bandId);
     if (cached) {
+        _sortSetlists(cached);
         _renderSetlistOptions(cached);
         // Index de nummers uit de setlists voor offline gebruik
         cached.forEach(function(sl) { _indexSongs(sl.songs || []); });
@@ -198,6 +205,7 @@ function loadSetlistDropdown() {
     $.get('api/setlists.php?band_id=' + bandId)
         .done(function(data) {
             var lists = data.setlists || [];
+            _sortSetlists(lists);
             lgSave('setlists', bandId, lists);
             _renderSetlistOptions(lists);
             lists.forEach(function(sl) { _indexSongs(sl.songs || []); });
