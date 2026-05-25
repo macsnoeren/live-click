@@ -202,28 +202,29 @@ html, body { background-color: var(--bg); color: #e0e0e0; min-height: 100vh; }
     white-space: nowrap;
 }
 .ls-usage-bar {
-    width: 48px;
-    height: 4px;
-    background: #2a2a2a;
-    border-radius: 2px;
+    width: 52px;
+    height: 6px;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 3px;
     overflow: hidden;
     flex-shrink: 0;
 }
 .ls-usage-fill {
     height: 100%;
-    border-radius: 2px;
-    background: #444;
+    border-radius: 3px;
+    background: #7a2222;
     transition: width 0.4s, background 0.4s;
-    min-width: 1px;
+    min-width: 2px;
 }
 .ls-usage-label {
     font-size: 0.68rem;
-    color: #555;
+    color: #666;
     letter-spacing: 0.01em;
     transition: color 0.3s;
 }
 /* warn > 60 % */
-.ls-usage.ls-warn .ls-usage-fill  { background: #a06020; }
+.ls-usage.ls-warn .ls-usage-fill  { background: #b06820; }
 .ls-usage.ls-warn .ls-usage-label { color: #a06020; }
 /* full > 90 % */
 .ls-usage.ls-full .ls-usage-fill  { background: #cc3333; }

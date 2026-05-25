@@ -18,6 +18,7 @@
             var bytes = 0;
             for (var i = 0; i < localStorage.length; i++) {
                 var k = localStorage.key(i);
+                if (!k) continue;
                 bytes += (k.length + (localStorage.getItem(k) || '').length) * 2;
             }
             var kb   = bytes / 1024;
