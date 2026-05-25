@@ -62,19 +62,19 @@ function requireAdmin(): void {
     }
 }
 
-// Returns a path relative to the calling script pointing to a file in the app root.
+/**
+ * Geeft een URL-relatief pad terug vanuit het huidige script naar $file in de webroot.
+ *
+ * Gebruikt APP_DEPTH (gedefinieerd in htdocs/live-click/bootstrap.php) om te weten
+ * hoeveel niveaus het huidige script onder de webroot zit.
+ *
+ * Voorbeelden (webroot = /live-click/):
+ *   script = /live-click/join.php       (depth 0) → "login.php"
+ *   script = /live-click/api/songs.php  (depth 1) → "../login.php"
+ */
 function appRelPath(string $file): string {
-    $appRoot   = realpath(__DIR__ . '/..');
-    $scriptDir = realpath(dirname($_SERVER['SCRIPT_FILENAME']));
-    if (!$appRoot || !$scriptDir || $scriptDir === $appRoot) return $file;
-    $prefix = '';
-    $dir = $scriptDir;
-    while ($dir !== $appRoot && strlen($dir) > strlen($appRoot)) {
-        $prefix .= '../';
-        $dir = realpath($dir . '/..');
-        if (!$dir) break;
-    }
-    return $prefix . $file;
+    $depth = defined('APP_DEPTH') ? (int) APP_DEPTH : 0;
+    return str_repeat('../', $depth) . $file;
 }
 
 function currentUser(): ?array {
