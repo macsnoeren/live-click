@@ -9,8 +9,8 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
     $bandId = $_GET['band_id'] ?? null;
-    // Exclude drum_svg from list (can be large; regenerated on demand via drum_preview.php)
-    $cols = 'id,title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,band_id,created_by,created_at';
+    // drum_svg is included so the dashboard can work offline (cached in localStorage)
+    $cols = 'id,title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,drum_svg,band_id,created_by,created_at';
     if (!$bandId) {
         // No band filter → return nothing (prevents leaking songs from other bands)
         echo json_encode(['ok' => true, 'songs' => []]);

@@ -42,8 +42,8 @@ $hasLists = !empty($setlists);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $bandName ?> — Setlijsten</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         /* ── Donker thema (scherm) ─────────────────────────────────────── */
         body { background:#0b0b0b; color:#e0e0e0; font-family:system-ui,Arial,sans-serif; }

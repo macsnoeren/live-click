@@ -21,6 +21,13 @@ require APP_ROOT . '/includes/header.php';
 </div>
 <?php endif; ?>
 
+<!-- Offline-melding (verborgen zolang de server bereikbaar is) -->
+<div id="lg-offline-badge" style="display:none;background:#1a0000;border-bottom:1px solid #330000;
+     color:#cc6666;font-size:0.8rem;padding:5px 20px;text-align:center">
+    <i class="bi bi-wifi-off me-1"></i> Offline — werkt op lokale cache
+    <span id="lg-cache-ts" class="ms-2" style="color:#884444"></span>
+</div>
+
 <div class="db-wrap">
 
     <!-- Left: setlist -->
