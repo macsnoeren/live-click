@@ -11,6 +11,9 @@ if (!defined('APP_ROOT')) {
     define('APP_ROOT', dirname(__DIR__, 2));
 }
 
+// Security headers altijd actief — vóór alle output
+require_once APP_ROOT . '/includes/security_headers.php';
+
 /**
  * APP_DEPTH: hoe diep bevindt het huidige script zich onder de webroot?
  *   0 = direct in htdocs/live-click/  (login.php, join.php, dashboard.php …)

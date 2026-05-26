@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
+csrfRequire();
 header('Content-Type: application/json');
 
 $db      = getDB();
@@ -162,6 +163,7 @@ if ($method === 'DELETE') {
     if ($id) {
         requireAdmin();
         $db->prepare('DELETE FROM bands WHERE id=?')->execute([$id]);
+        auditLog('band.delete', 'band', $id);
         echo json_encode(['ok' => true]);
         exit;
     }

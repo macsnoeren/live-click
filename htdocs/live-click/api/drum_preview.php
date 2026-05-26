@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
+csrfRequire();
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

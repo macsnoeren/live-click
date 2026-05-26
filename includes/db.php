@@ -94,6 +94,37 @@ function initSchema(PDO $db): void {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS auth_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bucket TEXT NOT NULL,
+            ts DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_auth_attempts_bucket_ts ON auth_attempts(bucket, ts);
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            actor_id INTEGER,
+            actor_username TEXT,
+            ip TEXT,
+            action TEXT NOT NULL,
+            target_type TEXT,
+            target_id INTEGER,
+            details TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
+        CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor_id);
+
+        CREATE TABLE IF NOT EXISTS totp_backup_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            code_hash TEXT NOT NULL,
+            used_at DATETIME,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_backup_user ON totp_backup_codes(user_id);
     ");
 
     // Add columns introduced after initial schema (safe to run on existing DBs)
@@ -108,11 +139,29 @@ function initSchema(PDO $db): void {
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
 
-    // Seed default admin if no users exist
+    // Eenmalige migratie: bestaande plaintext share-/invite-tokens vervangen door SHA-256-hash.
+    // Plaintext = 32 hex chars (bin2hex(random_bytes(16))); hash = 64 hex chars.
+    try {
+        $rows = $db->query("SELECT id, share_token FROM bands WHERE share_token IS NOT NULL AND length(share_token) = 32")->fetchAll();
+        $upd  = $db->prepare('UPDATE bands SET share_token = ? WHERE id = ?');
+        foreach ($rows as $r) {
+            $upd->execute([hash('sha256', $r['share_token']), $r['id']]);
+        }
+    } catch (PDOException $e) { /* migratie kan nog niet draaien tijdens initial install */ }
+    try {
+        $rows = $db->query("SELECT id, token FROM band_invites WHERE length(token) = 32")->fetchAll();
+        $upd  = $db->prepare('UPDATE band_invites SET token = ? WHERE id = ?');
+        foreach ($rows as $r) {
+            $upd->execute([hash('sha256', $r['token']), $r['id']]);
+        }
+    } catch (PDOException $e) {}
+
+    // Seed default admin if no users exist.
+    // must_change_password = 1 dwingt direct een wachtwoordwijziging af na de eerste login.
     $count = $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
     if ($count == 0) {
         $hash = password_hash('admin', PASSWORD_DEFAULT);
-        $db->prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, 'admin')")
+        $db->prepare("INSERT INTO users (username, email, password_hash, role, must_change_password) VALUES (?, ?, ?, 'admin', 1)")
            ->execute(['admin', 'admin@livegig.local', $hash]);
     }
 }

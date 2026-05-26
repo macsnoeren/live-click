@@ -1,1 +1,9 @@
 *~
+
+# Lokale, niet-versiebeheerde configuratie (secrets)
+includes/config.local.php
+
+# Runtime data
+data/livegig.db
+data/.spotify_token
+data/*.log

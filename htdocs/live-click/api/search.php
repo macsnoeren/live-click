@@ -8,20 +8,44 @@ header('Content-Type: application/json');
 $q = trim($_GET['q'] ?? '');
 if (!$q) { echo json_encode(['ok' => false, 'results' => [], 'source' => 'none']); exit; }
 
-// Local library lookup — aggregate per title+artist to avoid duplicates across bands
+// Local library lookup — aggregate per title+artist to avoid duplicates.
+// Beperk tot bands waar de huidige gebruiker lid van is (admin ziet alles).
 $db   = getDB();
 $like = '%' . $q . '%';
-$stmt = $db->prepare(
-    'SELECT title, artist, MAX(bpm) AS bpm, MAX(song_key) AS song_key, MAX(duration) AS duration
-       FROM songs
-      WHERE LOWER(title)  LIKE LOWER(?)
-         OR LOWER(artist) LIKE LOWER(?)
-      GROUP BY title, artist
-      ORDER BY title COLLATE NOCASE
-      LIMIT 8'
-);
-$stmt->execute([$like, $like]);
-$dbHits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$user = currentUser();
+
+if ($user['role'] === 'admin') {
+    $stmt = $db->prepare(
+        'SELECT title, artist, MAX(bpm) AS bpm, MAX(song_key) AS song_key, MAX(duration) AS duration
+           FROM songs
+          WHERE LOWER(title)  LIKE LOWER(?)
+             OR LOWER(artist) LIKE LOWER(?)
+          GROUP BY title, artist
+          ORDER BY title COLLATE NOCASE
+          LIMIT 8'
+    );
+    $stmt->execute([$like, $like]);
+} else {
+    $myBands = userBands((int)$user['id']);
+    if (!$myBands) {
+        $dbHits = [];
+    } else {
+        $ids = array_map(fn($b) => (int)$b['id'], $myBands);
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $db->prepare(
+            "SELECT title, artist, MAX(bpm) AS bpm, MAX(song_key) AS song_key, MAX(duration) AS duration
+               FROM songs
+              WHERE band_id IN ($ph)
+                AND (LOWER(title)  LIKE LOWER(?)
+                  OR LOWER(artist) LIKE LOWER(?))
+              GROUP BY title, artist
+              ORDER BY title COLLATE NOCASE
+              LIMIT 8"
+        );
+        $stmt->execute(array_merge($ids, [$like, $like]));
+    }
+}
+if (!isset($dbHits)) $dbHits = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Priority: 1. Tunebat  2. GetSongBPM  3. Spotify  4. MusicBrainz
 $results = searchTunebat($q);

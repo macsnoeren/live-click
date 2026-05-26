@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
+csrfRequire();
 header('Content-Type: application/json');
 
 $db     = getDB();
@@ -19,7 +20,8 @@ $isAdmin = $user['role'] === 'admin';
 
 if ($method === 'GET') {
     $bandId = (int)($_GET['band_id'] ?? 0);
-    // Any member may read the current token (to show the link), only leader/admin can create one
+    // Lidmaatschap is voldoende om te zien dat er een link bestaat;
+    // de plaintext wordt nooit teruggestuurd (alleen bij creatie).
     $isMember = false;
     if ($bandId) {
         $s = $db->prepare('SELECT 1 FROM band_members WHERE band_id=? AND user_id=?');
@@ -29,10 +31,10 @@ if ($method === 'GET') {
     if (!$bandId || (!$isMember && !$isAdmin)) {
         echo json_encode(['ok' => false, 'error' => 'Geen toegang']); exit;
     }
-    $stmt = $db->prepare('SELECT token FROM band_invites WHERE band_id=?');
+    $stmt = $db->prepare('SELECT 1 FROM band_invites WHERE band_id=?');
     $stmt->execute([$bandId]);
-    $row = $stmt->fetch();
-    echo json_encode(['ok' => true, 'token' => $row['token'] ?? null]);
+    $hasToken = (bool)$stmt->fetchColumn();
+    echo json_encode(['ok' => true, 'has_token' => $hasToken]);
     exit;
 }
 
@@ -43,9 +45,10 @@ if ($method === 'POST') {
         echo json_encode(['ok' => false, 'error' => 'Alleen de bandleider mag uitnodigingslinks beheren']); exit;
     }
     $token = bin2hex(random_bytes(16));
+    $hash  = hash('sha256', $token);
     $db->prepare('INSERT INTO band_invites (band_id, token, created_by) VALUES (?,?,?)
                   ON CONFLICT(band_id) DO UPDATE SET token=excluded.token, created_by=excluded.created_by, created_at=CURRENT_TIMESTAMP')
-       ->execute([$bandId, $token, $user['id']]);
+       ->execute([$bandId, $hash, $user['id']]);
     echo json_encode(['ok' => true, 'token' => $token]);
     exit;
 }

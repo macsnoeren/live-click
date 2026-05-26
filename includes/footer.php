@@ -4,6 +4,22 @@
 <!-- Vendor-bestanden lokaal opgeslagen — app werkt ook zonder internet -->
 <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script src="assets/vendor/jquery/jquery.min.js"></script>
+<script>
+// CSRF: stuur token mee bij elke niet-GET jQuery ajax-call.
+// ajaxSend (event) ipv ajaxSetup.beforeSend — wordt niet overschreven door call-specifieke beforeSend.
+(function() {
+    var meta  = document.querySelector('meta[name="csrf-token"]');
+    var token = meta ? meta.getAttribute('content') : '';
+    if (!token || !window.jQuery) return;
+    window.LG_CSRF = token; // ook beschikbaar voor handmatige fetch() calls
+    jQuery(document).ajaxSend(function(event, xhr, settings) {
+        var m = (settings.type || 'GET').toUpperCase();
+        if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS') {
+            xhr.setRequestHeader('X-CSRF-Token', token);
+        }
+    });
+})();
+</script>
 <script src="assets/js/clicktrack.js?v=<?= filemtime(APP_ROOT . '/htdocs/live-click/assets/js/clicktrack.js') ?>"></script>
 <script src="assets/js/app.js?v=<?= filemtime(APP_ROOT . '/htdocs/live-click/assets/js/app.js') ?>"></script>
 <?= $extraScripts ?? '' ?>

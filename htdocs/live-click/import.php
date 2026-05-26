@@ -136,6 +136,7 @@ $skipped  = null;
 $postErrors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$parseError) {
+    csrfRequire();
     $bandId  = (int)($_POST['band_id'] ?? 0) ?: null;
     $replace = !empty($_POST['replace']);
     $createBand = trim($_POST['new_band'] ?? '');
@@ -208,6 +209,7 @@ require APP_ROOT . '/includes/header.php';
 
     <?php if (!$parseError): ?>
     <form method="post" class="card p-3 mb-4">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(csrfToken()) ?>">
         <div class="row g-3">
             <div class="col-md-5">
                 <label class="form-label">Koppel aan bestaande band</label>

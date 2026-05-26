@@ -326,8 +326,9 @@ function toggleInvite(bandId) {
         section.html(\'<div class="text-muted small"><i class="bi bi-hourglass-split"></i> Laden...</div>\');
         $.get("api/invite.php", {band_id: bandId}, function(r) {
             section.data("loaded", true);
-            if (r.token) {
-                renderInviteToken(bandId, r.token);
+            // Plaintext-token wordt alleen bij creatie geretourneerd; bij GET zien we alleen of er één is.
+            if (r.has_token) {
+                renderInviteExists(bandId);
             } else {
                 renderNoInvite(bandId);
             }
@@ -360,6 +361,18 @@ function renderNoInvite(bandId) {
     section.html(
         \'<p class="text-muted small mb-2">Nog geen uitnodigingslink aangemaakt.</p>\'
         + \'<button class="btn btn-xs btn-outline-secondary" onclick="regenerateInvite(\' + bandId + \')"><i class="bi bi-plus-lg me-1"></i>Link aanmaken</button>\'
+    );
+}
+
+// Token bestaat al maar plaintext is niet bekend (alleen bij creatie zichtbaar).
+function renderInviteExists(bandId) {
+    var section = $("#invite-" + bandId);
+    section.html(
+        \'<p class="text-muted small mb-2">Er bestaat een uitnodigingslink. De URL wordt om veiligheidsredenen alleen bij aanmaak getoond.</p>\'
+        + \'<div class="d-flex gap-2">\'
+        + \'<button class="btn btn-xs btn-outline-secondary" onclick="regenerateInvite(\' + bandId + \')"><i class="bi bi-arrow-repeat me-1"></i>Nieuwe link</button>\'
+        + \'<button class="btn btn-xs btn-outline-danger" onclick="revokeInvite(\' + bandId + \')"><i class="bi bi-trash me-1"></i>Verwijder link</button>\'
+        + \'</div>\'
     );
 }
 
@@ -413,8 +426,9 @@ function toggleShare(bandId) {
         section.html(\'<div class="text-muted small"><i class="bi bi-hourglass-split"></i> Laden...</div>\');
         $.get("api/share.php?band_id=" + bandId, function(r) {
             section.data("loaded", true);
-            if (r.token) { renderShareToken(bandId, r.token); }
-            else         { renderNoShare(bandId); }
+            // Plaintext-token alleen bij creatie geretourneerd; bij GET zien we alleen of er één is.
+            if (r.has_token) { renderShareExists(bandId); }
+            else             { renderNoShare(bandId); }
         });
     }
 }
@@ -437,6 +451,17 @@ function renderNoShare(bandId) {
     $("#share-" + bandId).html(
         \'<p class="text-muted small mb-2">Nog geen deellink aangemaakt.</p>\'
         + \'<button class="btn btn-xs btn-outline-secondary" onclick="regenerateShare(\' + bandId + \')"><i class="bi bi-plus-lg me-1"></i>Link aanmaken</button>\'
+    );
+}
+
+// Token bestaat al maar plaintext is niet bekend (alleen bij creatie zichtbaar).
+function renderShareExists(bandId) {
+    $("#share-" + bandId).html(
+        \'<p class="text-muted small mb-2">Er bestaat een deellink. De URL wordt om veiligheidsredenen alleen bij aanmaak getoond.</p>\'
+        + \'<div class="d-flex gap-2">\'
+        + \'<button class="btn btn-xs btn-outline-secondary" onclick="regenerateShare(\' + bandId + \')"><i class="bi bi-arrow-repeat me-1"></i>Nieuwe link</button>\'
+        + \'<button class="btn btn-xs btn-outline-danger" onclick="revokeShare(\' + bandId + \')"><i class="bi bi-trash me-1"></i>Verwijder</button>\'
+        + \'</div>\'
     );
 }
 

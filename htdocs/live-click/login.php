@@ -6,11 +6,18 @@ if (currentUser()) { header('Location: dashboard.php'); exit; }
 
 $error     = '';
 $show2fa   = !empty($_SESSION['2fa_pending_id']);
+$csrf      = csrfToken();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrfRequire();
 
     if (isset($_POST['action']) && $_POST['action'] === 'verify_2fa') {
         // ── Step 2: verify TOTP code ────────────────────────────────────────
+        $pendingId = (int)($_SESSION['2fa_pending_id'] ?? 0);
+        // Twee buckets: per-account (strenger) en per-IP (defense-in-depth)
+        rateLimitCheck('totp:user:' . $pendingId, 5, 600);
+        rateLimitCheck('totp:ip:'   . clientIp(), 20, 600);
+
         $code = trim($_POST['code'] ?? '');
         if (verifyTotpLogin($code)) {
             if (!empty($_SESSION['2fa_pending_remember'])) {
@@ -18,7 +25,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             _doRedirect();
         } else {
+            rateLimitRecord('totp:user:' . $pendingId);
+            rateLimitRecord('totp:ip:'   . clientIp());
             $error   = 'Ongeldige verificatiecode. Probeer opnieuw.';
+            $show2fa = true;
+        }
+
+    } elseif (isset($_POST['action']) && $_POST['action'] === 'verify_backup') {
+        // ── Step 2 alt: backup-code als TOTP-alternatief ──────────────────
+        $pendingId = (int)($_SESSION['2fa_pending_id'] ?? 0);
+        rateLimitCheck('backup:user:' . $pendingId, 5, 600);
+        rateLimitCheck('backup:ip:'   . clientIp(), 20, 600);
+
+        $code = trim($_POST['code'] ?? '');
+        if (verifyBackupCodeLogin($code)) {
+            if (!empty($_SESSION['2fa_pending_remember'])) {
+                createRememberToken($_SESSION['user_id']);
+            }
+            _doRedirect();
+        } else {
+            rateLimitRecord('backup:user:' . $pendingId);
+            rateLimitRecord('backup:ip:'   . clientIp());
+            $error   = 'Ongeldige backup-code.';
             $show2fa = true;
         }
 
@@ -34,6 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = $_POST['password'] ?? '';
         $remember = !empty($_POST['remember']);
 
+        // Rate-limit op username (sleutel om brute-force op één account te stoppen)
+        // én op IP (om verspreid brute-forcen te dempen).
+        rateLimitCheck('login:user:' . strtolower($username), 5, 600);
+        rateLimitCheck('login:ip:'   . clientIp(),            20, 600);
+
         $result = login($username, $password);
 
         if ($result === 'ok') {
@@ -45,18 +78,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $show2fa = true;
 
         } else {
+            rateLimitRecord('login:user:' . strtolower($username));
+            rateLimitRecord('login:ip:'   . clientIp());
             $error = 'Gebruikersnaam of wachtwoord onjuist.';
         }
     }
 }
 
 function _doRedirect(): void {
-    $next = $_GET['next'] ?? '';
-    if ($next && preg_match('/^[a-zA-Z0-9_\-\.\/\?=&%]+$/', $next) && !str_starts_with($next, '//')) {
-        header('Location: ' . $next);
-    } else {
-        header('Location: dashboard.php');
-    }
+    $next = safeLocalRedirect($_GET['next'] ?? '', 'dashboard.php');
+    header('Location: ' . $next);
     exit;
 }
 ?>
@@ -97,20 +128,39 @@ function _doRedirect(): void {
                 Vul de 6-cijferige code in van je authenticator-app.
             </p>
         </div>
+        <?php $useBackup = !empty($_GET['backup']); ?>
         <form method="POST">
-            <input type="hidden" name="action" value="verify_2fa">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="action" value="<?= $useBackup ? 'verify_backup' : 'verify_2fa' ?>">
             <div class="mb-3">
-                <label class="form-label">Verificatiecode</label>
+                <label class="form-label">
+                    <?= $useBackup ? 'Backup-code (10 cijfers)' : 'Verificatiecode' ?>
+                </label>
+                <?php if ($useBackup): ?>
+                <input type="text" name="code" class="form-control text-center fw-bold"
+                       maxlength="11" autocomplete="one-time-code" inputmode="numeric"
+                       autofocus placeholder="00000-00000"
+                       style="letter-spacing:0.15em">
+                <?php else: ?>
                 <input type="text" name="code" class="form-control text-center fw-bold fs-4 letter-spacing-3"
                        maxlength="6" autocomplete="one-time-code" inputmode="numeric"
                        pattern="[0-9]{6}" autofocus placeholder="000000"
                        style="letter-spacing:0.4em">
+                <?php endif; ?>
             </div>
             <button type="submit" class="btn btn-danger w-100 fw-bold">
                 <i class="bi bi-shield-check"></i> Verifiëren
             </button>
         </form>
+        <div class="text-center mt-2">
+            <?php if ($useBackup): ?>
+                <a href="login.php" class="text-muted small">← Terug naar verificatiecode</a>
+            <?php else: ?>
+                <a href="login.php?backup=1" class="text-muted small">Authenticator-app niet beschikbaar? Gebruik een backup-code</a>
+            <?php endif; ?>
+        </div>
         <form method="POST" class="mt-2">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
             <input type="hidden" name="action" value="cancel_2fa">
             <button type="submit" class="btn btn-link btn-sm w-100 text-muted">Annuleren</button>
         </form>
@@ -118,6 +168,7 @@ function _doRedirect(): void {
         <?php else: ?>
         <!-- ── Credentials step ───────────────────────────────────────── -->
         <form method="POST">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
             <div class="mb-3">
                 <label class="form-label">Gebruikersnaam</label>
                 <input type="text" name="username" class="form-control" autofocus

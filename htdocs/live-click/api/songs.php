@@ -2,22 +2,24 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
+csrfRequire();
 header('Content-Type: application/json');
 
 $db = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $bandId = $_GET['band_id'] ?? null;
-    // drum_svg is included so the dashboard can work offline (cached in localStorage)
-    $cols = 'id,title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,drum_svg,band_id,created_by,created_at';
+    $bandId = (int)($_GET['band_id'] ?? 0);
     if (!$bandId) {
         // No band filter → return nothing (prevents leaking songs from other bands)
         echo json_encode(['ok' => true, 'songs' => []]);
         exit;
     }
+    requireBandAccess($bandId);
+    // drum_svg is included so the dashboard can work offline (cached in localStorage)
+    $cols = 'id,title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,drum_svg,band_id,created_by,created_at';
     $stmt = $db->prepare("SELECT $cols FROM songs WHERE band_id = ? ORDER BY title COLLATE NOCASE");
-    $stmt->execute([(int)$bandId]);
+    $stmt->execute([$bandId]);
     echo json_encode(['ok' => true, 'songs' => $stmt->fetchAll()]);
     exit;
 }
@@ -37,6 +39,14 @@ if ($method === 'POST') {
     $previewUrl = trim($data['preview_url'] ?? '') ?: null;
     $spotifyId  = trim($data['spotify_id']  ?? '') ?: null;
     $drumNotation = trim($data['drum_notation'] ?? '') ?: null;
+
+    // Bescherming tegen DoS via gigantische velden (M4)
+    if (strlen($desc ?? '') > 4000 || strlen($drumNotation ?? '') > 5000) {
+        http_response_code(413);
+        echo json_encode(['ok' => false, 'error' => 'Beschrijving of drumnotatie te lang.']);
+        exit;
+    }
+
     // Regenerate SVG whenever notation is saved
     $drumSvg = null;
     $drumSvgUpdatedAt = null;
@@ -50,6 +60,28 @@ if ($method === 'POST') {
     $bandId  = ($rawBand !== null && $rawBand !== '' && $rawBand !== 'null' && (int)$rawBand > 0)
                ? (int)$rawBand : null;
 
+    // Autorisatie:
+    //   - Nieuwe song: gebruiker moet lid zijn van de doel-band (of admin).
+    //   - Bestaande song: gebruiker moet lid zijn van de HUIDIGE band én van de doel-band.
+    if ($id) {
+        $currentBandId = getSongBandId($id);
+        if ($currentBandId === null) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Nummer niet gevonden.']);
+            exit;
+        }
+        if (!userCanAccessBand($currentBandId)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Geen toegang tot dit nummer.']);
+            exit;
+        }
+    }
+    if ($bandId !== null && !userCanAccessBand($bandId)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Geen toegang tot de doel-band.']);
+        exit;
+    }
+
     try {
         if ($id) {
             $db->prepare('UPDATE songs SET title=?,artist=?,bpm=?,song_key=?,duration=?,starts=?,description=?,preview_url=?,spotify_id=?,drum_notation=?,drum_svg=?,drum_svg_updated_at=? WHERE id=?')
@@ -61,7 +93,9 @@ if ($method === 'POST') {
         }
         echo json_encode(['ok' => true, 'id' => $id]);
     } catch (PDOException $e) {
-        echo json_encode(['ok' => false, 'error' => 'Database fout: ' . $e->getMessage()]);
+        error_log('songs.php PDO: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Database fout bij opslaan.']);
     }
     exit;
 }
@@ -70,6 +104,19 @@ if ($method === 'DELETE') {
     $data = json_decode(file_get_contents('php://input'), true);
     $id = (int)($data['id'] ?? 0);
     if (!$id) { echo json_encode(['ok'=>false,'error'=>'Geen id']); exit; }
+
+    $bandId = getSongBandId($id);
+    if ($bandId === null) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'Nummer niet gevonden.']);
+        exit;
+    }
+    if (!userCanAccessBand($bandId)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Geen toegang tot dit nummer.']);
+        exit;
+    }
+
     $db->prepare('DELETE FROM songs WHERE id=?')->execute([$id]);
     echo json_encode(['ok'=>true]);
     exit;
