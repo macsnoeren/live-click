@@ -50,7 +50,7 @@ require APP_ROOT . '/includes/header.php';
         </div>
     </div>
 
-    <!-- Right: notities / drumstructuur in tabs (titel/BPM/artiest staan in de header) -->
+    <!-- Right: inhoud in tabs (titel/BPM/artiest staan in de header) -->
     <div class="db-col-right">
         <div class="card db-card db-detail-card" id="song-detail-card">
             <div class="card-header db-detail-header">
@@ -62,25 +62,74 @@ require APP_ROOT . '/includes/header.php';
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-lyrics-btn" data-bs-toggle="tab"
+                                data-bs-target="#tab-lyrics" type="button" role="tab">
+                            <i class="bi bi-mic"></i> Tekst
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-chords-btn" data-bs-toggle="tab"
+                                data-bs-target="#tab-chords" type="button" role="tab">
+                            <i class="bi bi-music-note"></i> Akkoorden
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <button class="nav-link" id="tab-drum-btn" data-bs-toggle="tab"
                                 data-bs-target="#tab-drum" type="button" role="tab">
                             <i class="bi bi-music-note-list"></i> Drumstructuur
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-pdf-btn" data-bs-toggle="tab"
+                                data-bs-target="#tab-pdf" type="button" role="tab">
+                            <i class="bi bi-file-earmark-pdf"></i> PDF
                         </button>
                     </li>
                 </ul>
             </div>
 
             <div class="tab-content db-tab-content">
+                <!-- Notities -->
                 <div class="tab-pane fade show active db-pane" id="tab-notes" role="tabpanel">
                     <div id="detail-desc" class="db-notes" style="display:none"></div>
                     <div id="detail-notes-empty" class="db-pane-empty">
                         <i class="bi bi-card-text"></i><span>Selecteer een nummer</span>
                     </div>
                 </div>
+
+                <!-- Songtekst -->
+                <div class="tab-pane fade db-pane" id="tab-lyrics" role="tabpanel">
+                    <div id="detail-lyrics" class="db-notes" style="display:none"></div>
+                    <div id="detail-lyrics-empty" class="db-pane-empty">
+                        <i class="bi bi-mic"></i>
+                        <span id="detail-lyrics-msg">Selecteer een nummer</span>
+                        <button type="button" id="detail-lyrics-fetch" class="btn btn-sm btn-outline-light mt-1"
+                                onclick="fetchLyrics()" style="display:none">
+                            <i class="bi bi-download"></i> Songtekst ophalen
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Akkoorden -->
+                <div class="tab-pane fade db-pane" id="tab-chords" role="tabpanel">
+                    <div id="detail-chords" class="db-notes db-chords" style="display:none"></div>
+                    <div id="detail-chords-empty" class="db-pane-empty">
+                        <i class="bi bi-music-note"></i><span>Geen akkoorden (in te voeren bij Nummers)</span>
+                    </div>
+                </div>
+
+                <!-- Drumstructuur -->
                 <div class="tab-pane fade db-pane" id="tab-drum" role="tabpanel">
                     <div id="detail-drum" class="db-drum" style="display:none"></div>
                     <div id="detail-drum-empty" class="db-pane-empty">
                         <i class="bi bi-music-note-list"></i><span>Geen drumstructuur</span>
+                    </div>
+                </div>
+
+                <!-- PDF (toekomst) -->
+                <div class="tab-pane fade db-pane" id="tab-pdf" role="tabpanel">
+                    <div class="db-pane-empty">
+                        <i class="bi bi-file-earmark-pdf"></i><span>PDF-weergave komt binnenkort</span>
                     </div>
                 </div>
             </div>

@@ -124,6 +124,22 @@ require APP_ROOT . '/includes/header.php';
                         </div>
                         <div class="col-12">
                             <label class="form-label d-flex justify-content-between align-items-baseline">
+                                <span><i class="bi bi-mic"></i> Songtekst</span>
+                                <span class="text-muted" style="font-size:0.72rem;font-weight:400">
+                                    Op het dashboard ook automatisch op te halen
+                                </span>
+                            </label>
+                            <textarea id="song-lyrics" class="form-control" rows="4"
+                                      placeholder="Songtekst..."></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-music-note"></i> Akkoorden</label>
+                            <textarea id="song-chords" class="form-control font-monospace" rows="4"
+                                      placeholder="Bijv.&#10;Intro: Am  F  C  G&#10;Couplet: Am  F  C  G"
+                                      autocomplete="off" spellcheck="false"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label d-flex justify-content-between align-items-baseline">
                                 <span><i class="bi bi-music-note-list"></i> Drumstructuur</span>
                                 <span class="text-muted" style="font-size:0.72rem;font-weight:400">
                                     <code class="text-muted">|</code>&nbsp;maat &nbsp;
@@ -266,6 +282,8 @@ function openAddSong() {
     $("#song-preview-url").val("");
     $("#song-spotify-id").val("");
     $("#song-drum-notation").val("");
+    $("#song-lyrics").val("");
+    $("#song-chords").val("");
     $("#drum-preview").hide().empty();
     $("#song-duplicate-warning").hide();
     $("#search-results").empty();
@@ -287,6 +305,8 @@ function openEditSong(i) {
     $("#song-preview-url").val(s.preview_url || "");
     $("#song-spotify-id").val(s.spotify_id || "");
     $("#song-drum-notation").val(s.drum_notation || "");
+    $("#song-lyrics").val(s.lyrics || "");
+    $("#song-chords").val(s.chords || "");
     $("#song-duplicate-warning").hide();
     $("#search-results").empty();
     refreshDrumPreview(s.drum_notation || "");
@@ -328,6 +348,8 @@ function saveSong() {
         preview_url: $("#song-preview-url").val(),
         spotify_id:  $("#song-spotify-id").val(),
         drum_notation: $("#song-drum-notation").val().trim(),
+        lyrics: $("#song-lyrics").val().trim(),
+        chords: $("#song-chords").val().trim(),
         band_id: ' . ($user['band_id'] ?? 'null') . '
     };
     if (!data.title || !data.artist) { alert("Titel en artiest zijn verplicht."); return; }

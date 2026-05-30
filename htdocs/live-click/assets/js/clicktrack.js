@@ -171,13 +171,54 @@ function fitDrumSvg() {
     svg.style.width = 'auto';
 }
 
+/* Id van het momenteel geselecteerde nummer (gebruikt door fetchLyrics). */
+var _currentSongId = null;
+
+/* ── Songtekst-tab vullen / lege staat tonen ── */
+function _renderLyrics(song) {
+    var el    = document.getElementById('detail-lyrics');
+    var empty = document.getElementById('detail-lyrics-empty');
+    var msg   = document.getElementById('detail-lyrics-msg');
+    var btn   = document.getElementById('detail-lyrics-fetch');
+    if (!el) return;
+
+    if (song && song.lyrics && song.lyrics.trim()) {
+        el.textContent   = song.lyrics;
+        el.style.display = '';
+        if (empty) empty.style.display = 'none';
+    } else {
+        el.style.display = 'none';
+        if (empty) empty.style.display = '';
+        if (msg) msg.textContent = song ? 'Nog geen songtekst voor dit nummer' : 'Selecteer een nummer';
+        if (btn) { btn.style.display = song ? '' : 'none'; btn.disabled = false; }
+    }
+}
+
 /* ── Selecteer een nummer (vanuit setlist of "Alle Nummers") ── */
 function selectSong(song) {
     _ct.bpm = parseInt(song.bpm, 10) || _ct.bpm;
+    _currentSongId = song.id;
 
     // Navigatiebalk (header): titel — artiest. BPM volgt via de click track.
     var songEl = document.getElementById('ct-song');
     if (songEl) songEl.textContent = song.title + (song.artist ? ' — ' + song.artist : '');
+
+    // Songtekst-tab
+    _renderLyrics(song);
+
+    // Akkoorden-tab
+    var chordsEl    = document.getElementById('detail-chords');
+    var chordsEmpty = document.getElementById('detail-chords-empty');
+    if (chordsEl) {
+        if (song.chords && song.chords.trim()) {
+            chordsEl.textContent   = song.chords;
+            chordsEl.style.display = '';
+            if (chordsEmpty) chordsEmpty.style.display = 'none';
+        } else {
+            chordsEl.style.display = 'none';
+            if (chordsEmpty) chordsEmpty.style.display = '';
+        }
+    }
 
     // Notities-tab
     var descEl    = document.getElementById('detail-desc');

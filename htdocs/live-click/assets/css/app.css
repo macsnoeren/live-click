@@ -683,7 +683,7 @@ body.page-dashboard #page-content {
 
 .db-tabs {
     border-bottom: none;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
 }
 .db-tabs .nav-link {
     color: #888;
@@ -728,6 +728,11 @@ body.page-dashboard #page-content {
     word-break: break-word;
 }
 .db-drum { overflow: auto; }
+.db-chords {
+    font-family: var(--bs-font-monospace, monospace);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
 
 /* Lege staat binnen een tab */
 .db-pane-empty {

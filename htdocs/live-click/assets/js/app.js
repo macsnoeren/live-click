@@ -110,6 +110,49 @@ function selectSongById(idOrEl) {
 }
 
 /* =========================================
+   Songtekst ophalen (lyrics.ovh, via api/lyrics.php) en opslaan.
+   Wordt aangeroepen vanuit de knop in de Tekst-tab.
+   ========================================= */
+function fetchLyrics() {
+    var id = _currentSongId;
+    if (!id) return;
+
+    var btn = document.getElementById('detail-lyrics-fetch');
+    var msg = document.getElementById('detail-lyrics-msg');
+    if (btn) btn.disabled = true;
+    if (msg) msg.textContent = 'Songtekst ophalen...';
+
+    $.ajax({
+        url: 'api/lyrics.php', type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ song_id: id }),
+        dataType: 'json'
+    }).done(function(r) {
+        if (r.ok && r.lyrics) {
+            // Bijwerken in geheugen + offline-cache
+            if (_songById[id]) _songById[id].lyrics = r.lyrics;
+            var bandId = typeof BAND_ID !== 'undefined' ? BAND_ID : null;
+            if (_allSongsCache) {
+                for (var i = 0; i < _allSongsCache.length; i++) {
+                    if (_allSongsCache[i].id == id) _allSongsCache[i].lyrics = r.lyrics;
+                }
+                if (bandId) lgSave('songs', bandId, _allSongsCache);
+            }
+            // Alleen de tab verversen als dit nog steeds het actieve nummer is
+            if (_currentSongId == id) _renderLyrics(_songById[id] || { lyrics: r.lyrics });
+        } else {
+            if (msg) msg.textContent = r.error || 'Geen songtekst gevonden.';
+            if (btn) btn.disabled = false;
+        }
+    }).fail(function(xhr) {
+        if (msg) msg.textContent = (xhr.status === 0)
+            ? 'Geen verbinding — songtekst kan niet worden opgehaald.'
+            : 'Ophalen mislukt (HTTP ' + xhr.status + ').';
+        if (btn) btn.disabled = false;
+    });
+}
+
+/* =========================================
    Dashboard: alle nummers (vult de cache)
    Wordt getoond als de virtuele setlist "Alle Nummers".
    ========================================= */

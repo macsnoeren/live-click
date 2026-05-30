@@ -17,7 +17,7 @@ if ($method === 'GET') {
     }
     requireBandAccess($bandId);
     // drum_svg is included so the dashboard can work offline (cached in localStorage)
-    $cols = 'id,title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,drum_svg,band_id,created_by,created_at';
+    $cols = 'id,title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,drum_svg,lyrics,chords,pdf_path,band_id,created_by,created_at';
     $stmt = $db->prepare("SELECT $cols FROM songs WHERE band_id = ? ORDER BY title COLLATE NOCASE");
     $stmt->execute([$bandId]);
     echo json_encode(['ok' => true, 'songs' => $stmt->fetchAll()]);
@@ -39,11 +39,14 @@ if ($method === 'POST') {
     $previewUrl = trim($data['preview_url'] ?? '') ?: null;
     $spotifyId  = trim($data['spotify_id']  ?? '') ?: null;
     $drumNotation = trim($data['drum_notation'] ?? '') ?: null;
+    $lyrics       = trim($data['lyrics'] ?? '') ?: null;
+    $chords       = trim($data['chords'] ?? '') ?: null;
 
     // Bescherming tegen DoS via gigantische velden (M4)
-    if (strlen($desc ?? '') > 4000 || strlen($drumNotation ?? '') > 5000) {
+    if (strlen($desc ?? '') > 4000 || strlen($drumNotation ?? '') > 5000
+        || strlen($lyrics ?? '') > 20000 || strlen($chords ?? '') > 20000) {
         http_response_code(413);
-        echo json_encode(['ok' => false, 'error' => 'Beschrijving of drumnotatie te lang.']);
+        echo json_encode(['ok' => false, 'error' => 'Een van de tekstvelden is te lang.']);
         exit;
     }
 
@@ -84,11 +87,11 @@ if ($method === 'POST') {
 
     try {
         if ($id) {
-            $db->prepare('UPDATE songs SET title=?,artist=?,bpm=?,song_key=?,duration=?,starts=?,description=?,preview_url=?,spotify_id=?,drum_notation=?,drum_svg=?,drum_svg_updated_at=? WHERE id=?')
-               ->execute([$title, $artist, $bpm, $key, $dur, $starts, $desc, $previewUrl, $spotifyId, $drumNotation, $drumSvg, $drumSvgUpdatedAt, $id]);
+            $db->prepare('UPDATE songs SET title=?,artist=?,bpm=?,song_key=?,duration=?,starts=?,description=?,preview_url=?,spotify_id=?,drum_notation=?,drum_svg=?,drum_svg_updated_at=?,lyrics=?,chords=? WHERE id=?')
+               ->execute([$title, $artist, $bpm, $key, $dur, $starts, $desc, $previewUrl, $spotifyId, $drumNotation, $drumSvg, $drumSvgUpdatedAt, $lyrics, $chords, $id]);
         } else {
-            $db->prepare('INSERT INTO songs (title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,drum_svg,drum_svg_updated_at,band_id,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-               ->execute([$title, $artist, $bpm, $key, $dur, $starts, $desc, $previewUrl, $spotifyId, $drumNotation, $drumSvg, $drumSvgUpdatedAt, $bandId, currentUser()['id']]);
+            $db->prepare('INSERT INTO songs (title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,drum_svg,drum_svg_updated_at,lyrics,chords,band_id,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+               ->execute([$title, $artist, $bpm, $key, $dur, $starts, $desc, $previewUrl, $spotifyId, $drumNotation, $drumSvg, $drumSvgUpdatedAt, $lyrics, $chords, $bandId, currentUser()['id']]);
             $id = $db->lastInsertId();
         }
         echo json_encode(['ok' => true, 'id' => $id]);
