@@ -17,60 +17,6 @@ Setlist 1 "songs": [82, 107, 95, 116, 101, 103, 64, 45, 7, 20, 62, 122, 48, 44, 
 Setlist 2 "songs": [97, 120, 104, 113, 112, 92, 81, 123, 86, 58, 75, 111, 28, 10, 15, 24, 84, 42],  
 */
 
-function getLists () {
-    return [
-        {
-            "title": "All songs",
-            "songs": [],
-        },
-        {
-            "title": "Set 1",
-            "songs": [82, 107, 95, 116, 101, 103, 64, 45, 7, 20, 62, 29, 48, 44, 60],
-            
-        },
-        {
-            "title": "Set 2",
-            "songs": [97, 120, 104, 113, 112, 81, 123, 86, 53, 75, 111, 10, 15, 24, 84, 42],
-            
-        },
-    ];
-}
-
-function getListSongs (list) {
-    if ( list == 0 ) {
-        return getSongs(true);
-    }
-
-    songs = [];
-
-    if ( list < getLists().length ) {
-        for ( var i of getLists()[list].songs ) {
-            songs.push( getSongs()[i] );
-        }
-    }
-
-    return songs;
-}
-
-function getSongs(sorted = false) {
-    if ( !sorted ) {
-        return _songs;
-    }
-
-    songs = JSON.parse(JSON.stringify(_songs)); // deep copy, so underlying structure _songs not changed!
-
-    songs.sort( function(a, b) {
-        var keyA = a.title.toUpperCase();
-        var keyB = b.title.toUpperCase();
-
-        if (keyA < keyB) return -1;
-        if (keyA > keyB) return 1;
-        return 0;
-    });
-
-    return songs;
-}
-
 // Add who starts!
 var _songs = [
     {

@@ -92,6 +92,12 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             <!-- localStorage-gebruik -->
             <span id="ls-usage" class="ls-usage" title="Lokale cache (localStorage)"></span>
 
+            <!-- Volledig scherm -->
+            <button type="button" id="ct-fullscreen-btn" class="btn btn-sm btn-outline-secondary"
+                    onclick="toggleFullscreen()" title="Volledig scherm (F)">
+                <i class="bi bi-fullscreen" id="ct-fullscreen-icon"></i>
+            </button>
+
             <!-- Band -->
             <?php if (count($activeBands) > 1): ?>
             <div class="dropdown">
@@ -160,6 +166,44 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     document.addEventListener('DOMContentLoaded', adjustPadding);
     window.addEventListener('resize', adjustPadding);
     adjustPadding();
+})();
+</script>
+
+<!-- Volledig scherm: toggle + icoon-sync + sneltoets F -->
+<script>
+(function() {
+    function isFullscreen() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+    window.toggleFullscreen = function() {
+        var el = document.documentElement;
+        if (isFullscreen()) {
+            (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        } else {
+            (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+        }
+    };
+    function syncIcon() {
+        var icon = document.getElementById('ct-fullscreen-icon');
+        var btn  = document.getElementById('ct-fullscreen-btn');
+        if (!icon || !btn) return;
+        var on = isFullscreen();
+        icon.className = on ? 'bi bi-fullscreen-exit' : 'bi bi-fullscreen';
+        btn.title = on ? 'Volledig scherm afsluiten (F)' : 'Volledig scherm (F)';
+        btn.classList.toggle('btn-outline-secondary', !on);
+        btn.classList.toggle('btn-secondary', on);
+    }
+    document.addEventListener('fullscreenchange', syncIcon);
+    document.addEventListener('webkitfullscreenchange', syncIcon);
+    // Sneltoets "F" — behalve tijdens typen in een veld
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== 'f' && e.key !== 'F') return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        var t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        e.preventDefault();
+        window.toggleFullscreen();
+    });
 })();
 </script>
 
