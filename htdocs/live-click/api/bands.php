@@ -31,6 +31,15 @@ function getBandsForUser(PDO $db, int $userId, bool $isAdmin): array {
         );
         $stmt->execute([$b['id']]);
         $b['members'] = $stmt->fetchAll();
+
+        // Rol van de huidige gebruiker in deze band, zodat de frontend de juiste
+        // beheerknoppen kan tonen ('leader' geeft ledenbeheer; admin = altijd).
+        $b['my_role'] = $isAdmin ? 'admin' : null;
+        if (!$isAdmin) {
+            foreach ($b['members'] as $m) {
+                if ((int)$m['id'] === $userId) { $b['my_role'] = $m['role']; break; }
+            }
+        }
     }
     return $bands;
 }
@@ -58,6 +67,38 @@ if ($method === 'GET') {
 
 if ($method === 'POST') {
     $data      = json_decode(file_get_contents('php://input'), true);
+    $action    = $data['action'] ?? '';
+
+    /* ---- Ledenrol wijzigen (leider/admin) ---- */
+    if ($action === 'set_role') {
+        $bandId   = (int)($data['band_id'] ?? 0);
+        $targetId = (int)($data['user_id'] ?? 0);
+        $role     = $data['role'] ?? '';
+        if (!$bandId || !$targetId) { echo json_encode(['ok'=>false,'error'=>'Band en gebruiker verplicht']); exit; }
+        if (!in_array($role, ['leader','member','viewer'], true)) {
+            echo json_encode(['ok'=>false,'error'=>'Ongeldige rol']); exit;
+        }
+        if (!$isAdmin && !isBandLeader($db, $bandId, $user['id'])) {
+            echo json_encode(['ok'=>false,'error'=>'Alleen de bandleider mag rollen wijzigen']); exit;
+        }
+        if (!isBandMember($db, $bandId, $targetId)) {
+            echo json_encode(['ok'=>false,'error'=>'Deze gebruiker is geen lid van de band']); exit;
+        }
+        // Bescherm tegen het verwijderen van de laatste leider.
+        if ($role !== 'leader' && isBandLeader($db, $bandId, $targetId)) {
+            $cnt = $db->prepare("SELECT COUNT(*) FROM band_members WHERE band_id=? AND role='leader'");
+            $cnt->execute([$bandId]);
+            if ((int)$cnt->fetchColumn() <= 1) {
+                echo json_encode(['ok'=>false,'error'=>'De band moet minstens één leider houden. Maak eerst iemand anders leider.']); exit;
+            }
+        }
+        $db->prepare('UPDATE band_members SET role=? WHERE band_id=? AND user_id=?')
+           ->execute([$role, $bandId, $targetId]);
+        auditLog('band.member_role_changed', 'band', $bandId, ['user_id'=>$targetId, 'role'=>$role]);
+        echo json_encode(['ok'=>true]);
+        exit;
+    }
+
     $id        = (int)($data['id'] ?? 0);
     $name      = trim($data['name'] ?? '');
     $desc      = trim($data['description'] ?? '');

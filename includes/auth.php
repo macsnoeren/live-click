@@ -506,6 +506,60 @@ function requireBandAccess(int $bandId): void {
     }
 }
 
+// ── Band-rollen ──────────────────────────────────────────────────────────────
+//
+// Per band heeft een lid een rol in band_members.role:
+//   'leader'  — beheert leden + rollen én bewerkt inhoud (nummers/setlists)
+//   'member'  — bewerkt inhoud, maar beheert geen leden
+//   'viewer'  — mag alleen bekijken (dashboard/tekst/PDF), niets wijzigen
+//
+// De globale admin (users.role = 'admin') mag alles, ongeacht lidmaatschap.
+
+/** Bandrol van de (huidige of opgegeven) user: 'leader'|'member'|'viewer' of null. */
+function userBandRole(int $bandId, ?int $userId = null): ?string {
+    $user = currentUser();
+    if (!$user) return null;
+    $uid = $userId ?? (int)$user['id'];
+    $s   = getDB()->prepare('SELECT role FROM band_members WHERE band_id=? AND user_id=?');
+    $s->execute([$bandId, $uid]);
+    $role = $s->fetchColumn();
+    return $role === false ? null : (string)$role;
+}
+
+/** Mag de huidige user inhoud (nummers/setlists/PDF/tekst) van $bandId bewerken? */
+function userCanEditBandContent(int $bandId, ?int $userId = null): bool {
+    $user = currentUser();
+    if (!$user) return false;
+    if ($user['role'] === 'admin') return true;
+    return in_array(userBandRole($bandId, $userId), ['leader', 'member'], true);
+}
+
+/** Is de huidige user leider van $bandId (of globale admin)? */
+function userIsBandLeader(int $bandId, ?int $userId = null): bool {
+    $user = currentUser();
+    if (!$user) return false;
+    if ($user['role'] === 'admin') return true;
+    return userBandRole($bandId, $userId) === 'leader';
+}
+
+/** 403 als de user de inhoud van $bandId niet mag bewerken (viewer/niet-lid). */
+function requireBandContentAccess(int $bandId): void {
+    if (!$bandId || !userCanEditBandContent($bandId)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Je hebt alleen leesrechten voor deze band.']);
+        exit;
+    }
+}
+
+/** 403 als de user geen leider (of admin) van $bandId is. */
+function requireBandLeader(int $bandId): void {
+    if (!$bandId || !userIsBandLeader($bandId)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Alleen de bandleider mag dit doen.']);
+        exit;
+    }
+}
+
 /** band_id van een song; null als song niet bestaat. */
 function getSongBandId(int $songId): ?int {
     $s = getDB()->prepare('SELECT band_id FROM songs WHERE id=?');

@@ -35,11 +35,10 @@ if (!$song) {
     echo json_encode(['ok' => false, 'error' => 'Nummer niet gevonden.']);
     exit;
 }
-// band_id 0 = geen band; userCanAccessBand verwacht een int en weigert dit
-// voor niet-admins (admin krijgt altijd toegang).
-if (!userCanAccessBand($song['band_id'] !== null ? (int)$song['band_id'] : 0)) {
+// Songtekst ophalen schrijft naar het nummer → vereist bewerkrechten (geen viewer).
+if (!userCanEditBandContent($song['band_id'] !== null ? (int)$song['band_id'] : 0)) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'Geen toegang tot dit nummer.']);
+    echo json_encode(['ok' => false, 'error' => 'Je hebt alleen leesrechten voor dit nummer.']);
     exit;
 }
 

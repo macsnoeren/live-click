@@ -73,15 +73,15 @@ if ($method === 'POST') {
             echo json_encode(['ok' => false, 'error' => 'Nummer niet gevonden.']);
             exit;
         }
-        if (!userCanAccessBand($currentBandId)) {
+        if (!userCanEditBandContent((int)$currentBandId)) {
             http_response_code(403);
-            echo json_encode(['ok' => false, 'error' => 'Geen toegang tot dit nummer.']);
+            echo json_encode(['ok' => false, 'error' => 'Je hebt alleen leesrechten voor dit nummer.']);
             exit;
         }
     }
-    if ($bandId !== null && !userCanAccessBand($bandId)) {
+    if ($bandId !== null && !userCanEditBandContent($bandId)) {
         http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Geen toegang tot de doel-band.']);
+        echo json_encode(['ok' => false, 'error' => 'Je hebt alleen leesrechten voor de doel-band.']);
         exit;
     }
 
@@ -114,9 +114,9 @@ if ($method === 'DELETE') {
         echo json_encode(['ok' => false, 'error' => 'Nummer niet gevonden.']);
         exit;
     }
-    if (!userCanAccessBand($bandId)) {
+    if (!userCanEditBandContent((int)$bandId)) {
         http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Geen toegang tot dit nummer.']);
+        echo json_encode(['ok' => false, 'error' => 'Je hebt alleen leesrechten voor dit nummer.']);
         exit;
     }
 

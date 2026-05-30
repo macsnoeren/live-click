@@ -39,8 +39,16 @@ function pdfRequireSong(PDO $db): array {
     if (!$song) { pdfJson(['ok' => false, 'error' => 'Nummer niet gevonden.'], 404); }
 
     $bandId = $song['band_id'] !== null ? (int)$song['band_id'] : 0;
-    if (!userCanAccessBand($bandId)) {
-        pdfJson(['ok' => false, 'error' => 'Geen toegang tot dit nummer.'], 403);
+    // GET = bekijken (elke rol incl. viewer); POST/DELETE = wijzigen (geen viewer).
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $allowed = ($method === 'GET')
+        ? userCanAccessBand($bandId)
+        : userCanEditBandContent($bandId);
+    if (!$allowed) {
+        $msg = ($method === 'GET')
+            ? 'Geen toegang tot dit nummer.'
+            : 'Je hebt alleen leesrechten voor dit nummer.';
+        pdfJson(['ok' => false, 'error' => $msg], 403);
     }
     return $song;
 }

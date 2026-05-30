@@ -142,6 +142,24 @@ function initSchema(PDO $db): void {
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
 
+    // Migratie bandrollen: zorg dat elke band minstens één leider heeft.
+    // Bands zonder leider krijgen het oudste lidmaatschap (laagste band_members.id)
+    // als leider — "langst lid wordt leader".
+    try {
+        $bandsNoLeader = $db->query(
+            "SELECT b.id FROM bands b
+              WHERE NOT EXISTS (SELECT 1 FROM band_members m
+                                 WHERE m.band_id = b.id AND m.role = 'leader')"
+        )->fetchAll();
+        $oldest = $db->prepare('SELECT id FROM band_members WHERE band_id=? ORDER BY id ASC LIMIT 1');
+        $prom   = $db->prepare("UPDATE band_members SET role='leader' WHERE id=?");
+        foreach ($bandsNoLeader as $b) {
+            $oldest->execute([$b['id']]);
+            $mid = $oldest->fetchColumn();
+            if ($mid) $prom->execute([$mid]);
+        }
+    } catch (PDOException $e) { /* tabellen bestaan nog niet tijdens initial install */ }
+
     // Eenmalige migratie: bestaande plaintext share-/invite-tokens vervangen door SHA-256-hash.
     // Plaintext = 32 hex chars (bin2hex(random_bytes(16))); hash = 64 hex chars.
     try {
