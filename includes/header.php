@@ -10,6 +10,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle ?? 'LiveGig') ?></title>
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrfToken()) ?>">
     <!-- Vendor-bestanden lokaal opgeslagen — app werkt ook zonder internet -->
     <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
@@ -128,7 +129,14 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="profile.php"><i class="bi bi-person-gear me-2"></i>Profiel &amp; beveiliging</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="logout.php"><i class="bi bi-box-arrow-right me-2"></i>Uitloggen</a></li>
+                    <li>
+                        <form method="POST" action="logout.php" class="m-0">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(csrfToken()) ?>">
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-box-arrow-right me-2"></i>Uitloggen
+                            </button>
+                        </form>
+                    </li>
                 </ul>
             </div>
         </div>

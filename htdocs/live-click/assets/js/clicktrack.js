@@ -1,14 +1,13 @@
 /* LiveGig Click Track Engine */
 var _ct = {
-    bpm: 80,
-    running: false,
-    counter: 0,
-    tsPrev: 0,
-    autoStop: 25,
-    autoEnabled: true,
+    bpm:          80,
+    running:      false,
+    counter:      0,
+    autoStop:     25,
+    autoEnabled:  true,
     soundEnabled: false,
-    autoTimer: null,
-    numBeats: 4,
+    autoTimer:    null,
+    numBeats:     4,
 };
 
 /* ── Audio — volledig gesynthetiseerd, geen extern bestand nodig ── */
@@ -19,72 +18,107 @@ function ctInitAudio() {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 }
 
-/**
- * Speelt een kort gesynthetiseerd "klik"-geluid.
- * Beat 1 (counter === 0) krijgt een hogere toon als accent.
- * Geen netwerk vereist.
- */
-function ctPlayClick() {
-    if (!_audioCtx) return;
-    var now  = _audioCtx.currentTime;
-    var freq = (_ct.counter === 0) ? 1000 : 700; // accent op slag 1
-    var dur  = 0.055; // seconden
-
-    var osc  = _audioCtx.createOscillator();
-    var gain = _audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(_audioCtx.destination);
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, now);
-    gain.gain.setValueAtTime(1.0, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-
-    osc.start(now);
-    osc.stop(now + dur);
-}
+/* ── Web Audio lookahead-scheduler ────────────────────────────────────
+ *
+ * Aanpak (Chris Wilson / Google): plan beats 100 ms vooruit in de
+ * AudioContext-klok. Die klok loopt in een aparte audio-thread en
+ * heeft sub-milliseconde nauwkeurigheid, ongeacht JS-load of
+ * browser-throttling.
+ *
+ * De scheduler zelf draait op setTimeout(25 ms) — alleen om te kijken
+ * of er nieuwe beats gepland moeten worden. Er is GEEN spin-wait meer.
+ *
+ * Visuele dots: setTimeout afgestemd op AudioContext-tijd, dus oog en
+ * oor lopen synchroon.
+ * ────────────────────────────────────────────────────────────────── */
+var _nextBeatTime = 0;    // AudioContext-tijd van de eerstvolgende beat
+var _nextBeatIdx  = 0;    // Beat-index (0–3) van de eerstvolgende beat
+var _schedTimer   = null;
+var CT_LOOKAHEAD  = 0.10; // 100 ms vooruit plannen (seconden)
+var CT_SCHED_INT  = 25;   // Scheduler-interval (ms)
 
 function ctStart(bpm) {
     ctInitAudio();
-    if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
     if (bpm) _ct.bpm = parseInt(bpm, 10);
     if (_ct.running) return;
-    _ct.running = true;
-    _ct.counter = 0;
-    _ct.tsPrev = 0;
+
+    _ct.running   = true;
+    _ct.counter   = 0;
+    _nextBeatIdx  = 0;
+    _nextBeatTime = _audioCtx.currentTime; // eerste beat direct
     ctUpdateBpmDisplay();
 
     if (_ct.autoEnabled) {
         _ct.autoTimer = setTimeout(ctStop, _ct.autoStop * 1000);
     }
-    ctTick();
+    _ctSchedule();
 }
 
 function ctStop() {
     _ct.running = false;
     _ct.counter = 0;
-    _ct.tsPrev = 0;
+    if (_schedTimer)   { clearTimeout(_schedTimer);   _schedTimer   = null; }
     if (_ct.autoTimer) { clearTimeout(_ct.autoTimer); _ct.autoTimer = null; }
     ctResetDots();
-    document.getElementById('ct-bpm').textContent = '-- BPM';
+    var el = document.getElementById('ct-bpm');
+    if (el) el.textContent = '-- BPM';
 }
 
-function ctTick() {
-    if (!_ct.running) return;
-    var ts = performance.now();
-    var interval = 60000 / _ct.bpm;
+function _ctSchedule() {
+    if (!_ct.running || !_audioCtx) return;
 
-    if (_ct.tsPrev === 0 || (ts - _ct.tsPrev) > interval - 20) {
-        while (performance.now() - _ct.tsPrev < interval) { /* spin */ }
-        ts = performance.now();
+    var now      = _audioCtx.currentTime;
+    var beatSecs = 60.0 / _ct.bpm;
 
-        ctResetDots();
-        ctLightDot(_ct.counter);
-        if (_ct.soundEnabled) ctPlayClick();
-        _ct.counter = (_ct.counter + 1) % _ct.numBeats;
-        _ct.tsPrev = ts;
+    // Veiligheid: als de AudioContext lang gesuspend was (bijv. na
+    // achtergrondtabblad of schermvergrendeling), reset naar nu.
+    if (_nextBeatTime < now - 1.0) {
+        _nextBeatTime = now;
+        _nextBeatIdx  = 0;
     }
-    setTimeout(ctTick, 0);
+
+    while (_nextBeatTime < now + CT_LOOKAHEAD) {
+        var beatIdx  = _nextBeatIdx;
+        var beatTime = _nextBeatTime;
+
+        /* Audio: gepland op de exacte AudioContext-tijd (sample-accuraat) */
+        if (_ct.soundEnabled) {
+            _ctScheduleClick(beatIdx, beatTime);
+        }
+
+        /* Visueel: setTimeout afgestemd op de AudioContext-klok */
+        var msUntil = Math.max(0, (beatTime - now) * 1000);
+        (function(idx) {
+            setTimeout(function() {
+                if (!_ct.running) return;
+                ctResetDots();
+                ctLightDot(idx);
+                _ct.counter = idx;
+            }, msUntil);
+        })(beatIdx);
+
+        _nextBeatTime += beatSecs;
+        _nextBeatIdx   = (_nextBeatIdx + 1) % _ct.numBeats;
+    }
+
+    _schedTimer = setTimeout(_ctSchedule, CT_SCHED_INT);
+}
+
+/* Plant één klik op een exact tijdstip in de AudioContext-klok */
+function _ctScheduleClick(beatIdx, time) {
+    var freq = (beatIdx === 0) ? 1000 : 700; // beat 1 = accent
+    var dur  = 0.055;
+    var osc  = _audioCtx.createOscillator();
+    var gain = _audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(_audioCtx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, time);
+    gain.gain.setValueAtTime(1.0,   time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    osc.start(time);
+    osc.stop(time + dur);
 }
 
 function ctResetDots() {

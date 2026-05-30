@@ -10,8 +10,9 @@ $token = trim($_GET['t'] ?? '');
 if (!$token) { http_response_code(404); die('Ongeldige link.'); }
 
 $db   = getDB();
+// Token in DB is een SHA-256-hash van de plaintext-token in de URL.
 $stmt = $db->prepare('SELECT id, name FROM bands WHERE share_token=?');
-$stmt->execute([$token]);
+$stmt->execute([hash('sha256', $token)]);
 $band = $stmt->fetch();
 if (!$band) { http_response_code(404); die('Link niet gevonden of verlopen.'); }
 

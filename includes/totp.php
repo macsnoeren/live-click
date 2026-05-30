@@ -19,7 +19,7 @@ class Totp {
         if (strlen($code) !== 6) return false;
         $t = (int)floor(time() / 30);
         foreach ([-1, 0, 1] as $d) {
-            if (self::compute($secret, $t + $d) === $code) return true;
+            if (hash_equals(self::compute($secret, $t + $d), $code)) return true;
         }
         return false;
     }
@@ -33,10 +33,12 @@ class Totp {
             . '&digits=6&period=30';
     }
 
-    /** URL for a QR code image (via api.qrserver.com). */
+    /**
+     * @deprecated Lekte de TOTP-secret naar api.qrserver.com.
+     * Niet meer gebruikt — render QR client-side of toon de secret/otpauth-URI als tekst.
+     */
     public static function qrUrl(string $secret, string $user, string $issuer = 'LiveGig'): string {
-        return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='
-            . rawurlencode(self::otpauth($secret, $user, $issuer));
+        return '';
     }
 
     // ── Internal ─────────────────────────────────────────────────────────────

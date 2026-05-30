@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 requireAdmin();
+csrfRequire();
 header('Content-Type: application/json');
 
 $db = getDB();
@@ -34,20 +35,27 @@ if ($method === 'POST') {
 
     if (!$username || !$email) { echo json_encode(['ok'=>false,'error'=>'Gebruikersnaam en e-mail verplicht']); exit; }
 
+    if ($password && ($pwErr = validatePasswordStrength($password)) !== null) {
+        echo json_encode(['ok'=>false,'error'=>$pwErr]); exit;
+    }
+
     if ($id) {
         if ($password) {
             $db->prepare('UPDATE users SET username=?,email=?,password_hash=?,role=?,must_change_password=? WHERE id=?')
                ->execute([$username,$email,password_hash($password,PASSWORD_DEFAULT),$role,$mustChangePassword,$id]);
+            auditLog('user.password_reset_by_admin', 'user', (int)$id, ['must_change_password' => (bool)$mustChangePassword]);
         } else {
             $db->prepare('UPDATE users SET username=?,email=?,role=?,must_change_password=? WHERE id=?')
                ->execute([$username,$email,$role,$mustChangePassword,$id]);
         }
+        auditLog('user.update', 'user', (int)$id, ['username' => $username, 'role' => $role]);
     } else {
         if (!$password) { echo json_encode(['ok'=>false,'error'=>'Wachtwoord verplicht bij nieuw account']); exit; }
         try {
             $db->prepare('INSERT INTO users (username,email,password_hash,role,must_change_password) VALUES (?,?,?,?,?)')
                ->execute([$username,$email,password_hash($password,PASSWORD_DEFAULT),$role,$mustChangePassword]);
             $id = $db->lastInsertId();
+            auditLog('user.create', 'user', (int)$id, ['username' => $username, 'role' => $role]);
         } catch (PDOException $e) {
             echo json_encode(['ok'=>false,'error'=>'Gebruikersnaam of e-mail al in gebruik']); exit;
         }

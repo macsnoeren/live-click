@@ -18,8 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Vul alle verplichte velden in.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Ongeldig e-mailadres.';
-    } elseif (strlen($password) < 6) {
-        $error = 'Wachtwoord moet minimaal 6 tekens zijn.';
+    } elseif (($pwErr = validatePasswordStrength($password)) !== null) {
+        $error = $pwErr;
     } elseif ($password !== $confirm) {
         $error = 'Wachtwoorden komen niet overeen.';
     } else {
@@ -90,8 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="mb-3">
                 <label class="form-label small">Wachtwoord <span class="text-danger">*</span></label>
-                <input type="password" name="password" class="form-control" minlength="6">
-                <div class="form-text text-muted" style="font-size:0.72rem">Minimaal 6 tekens</div>
+                <input type="password" name="password" class="form-control" minlength="12">
+                <div class="form-text text-muted" style="font-size:0.72rem">Minimaal 12 tekens</div>
             </div>
             <div class="mb-4">
                 <label class="form-label small">Wachtwoord bevestigen <span class="text-danger">*</span></label>

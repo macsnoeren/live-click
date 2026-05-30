@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
+csrfRequire();
 header('Content-Type: application/json');
 
 $db     = getDB();
@@ -15,7 +16,7 @@ function canManageBand(PDO $db, int $bandId, array $user): bool {
     return (bool)$s->fetch();
 }
 
-/* GET ?band_id=N  — huidig token ophalen */
+/* GET ?band_id=N  — bestaat er een token? (plaintext wordt nooit teruggestuurd) */
 if ($method === 'GET') {
     $bandId = (int)($_GET['band_id'] ?? 0);
     if (!$bandId) { echo json_encode(['ok' => false, 'error' => 'band_id ontbreekt']); exit; }
@@ -25,12 +26,12 @@ if ($method === 'GET') {
     }
     $row = $db->prepare('SELECT share_token FROM bands WHERE id=?');
     $row->execute([$bandId]);
-    $token = $row->fetchColumn();
-    echo json_encode(['ok' => true, 'token' => $token ?: null]);
+    $hasToken = (bool)$row->fetchColumn();
+    echo json_encode(['ok' => true, 'has_token' => $hasToken]);
     exit;
 }
 
-/* POST {band_id}  — nieuw token genereren */
+/* POST {band_id}  — nieuw token genereren; plaintext wordt 1× teruggestuurd, hash in DB */
 if ($method === 'POST') {
     $data   = json_decode(file_get_contents('php://input'), true);
     $bandId = (int)($data['band_id'] ?? 0);
@@ -40,7 +41,8 @@ if ($method === 'POST') {
         echo json_encode(['ok' => false, 'error' => 'Geen toegang']); exit;
     }
     $token = bin2hex(random_bytes(16));
-    $db->prepare('UPDATE bands SET share_token=? WHERE id=?')->execute([$token, $bandId]);
+    $hash  = hash('sha256', $token);
+    $db->prepare('UPDATE bands SET share_token=? WHERE id=?')->execute([$hash, $bandId]);
     echo json_encode(['ok' => true, 'token' => $token]);
     exit;
 }

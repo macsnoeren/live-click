@@ -8,10 +8,11 @@ $token = trim($_GET['token'] ?? '');
 if (!$token) { header('Location: dashboard.php'); exit; }
 
 $db   = getDB();
+// Token in DB is een SHA-256-hash van de plaintext-token in de URL.
 $stmt = $db->prepare(
     'SELECT bi.band_id, b.name AS band_name FROM band_invites bi JOIN bands b ON b.id = bi.band_id WHERE bi.token = ?'
 );
-$stmt->execute([$token]);
+$stmt->execute([hash('sha256', $token)]);
 $invite = $stmt->fetch();
 
 $user = currentUser();
@@ -32,6 +33,7 @@ if ($invite) {
     $alreadyMember = (bool)$chk->fetch();
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        csrfRequire();
         if ($alreadyMember) {
             header('Location: bands.php'); exit;
         }
@@ -40,6 +42,7 @@ if ($invite) {
         $success = true;
     }
 }
+$csrf = csrfToken();
 ?>
 <!doctype html>
 <html lang="nl" data-bs-theme="dark">
@@ -99,6 +102,7 @@ if ($invite) {
                 Ingelogd als <strong><?= htmlspecialchars($user['username']) ?></strong>
             </p>
             <form method="POST">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
                 <button type="submit" class="btn btn-danger w-100 fw-bold">
                     <i class="bi bi-person-plus-fill me-2"></i> Deelnemen
                 </button>
