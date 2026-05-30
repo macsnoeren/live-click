@@ -734,6 +734,16 @@ body.page-dashboard #page-content {
     line-height: 1.5;
 }
 
+/* PDF-tab: iframe vult het paneel rand-tot-rand */
+.db-pane-pdf { padding: 0; overflow: hidden; }
+.db-pdf-frame {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    border: 0;
+    background: #fff;
+}
+
 /* Lege staat binnen een tab */
 .db-pane-empty {
     flex: 1;

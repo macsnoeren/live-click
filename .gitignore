@@ -7,3 +7,6 @@ includes/config.local.php
 data/livegig.db
 data/.spotify_token
 data/*.log
+
+# Geüploade bladmuziek-PDF's (gebruikersinhoud)
+data/pdfs/

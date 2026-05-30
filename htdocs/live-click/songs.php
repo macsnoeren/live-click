@@ -153,6 +153,19 @@ require APP_ROOT . '/includes/header.php';
                                       autocomplete="off" spellcheck="false"></textarea>
                             <div id="drum-preview" class="mt-2" style="display:none;overflow-x:auto;background:#0d0d0d;border:1px solid #1e1e1e;border-radius:6px;padding:6px"></div>
                         </div>
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-file-earmark-pdf"></i> Bladmuziek (PDF)
+                                <span class="text-muted" style="font-size:0.72rem;font-weight:400">max 10 MB</span>
+                            </label>
+                            <div id="song-pdf-current" class="small mb-1" style="display:none">
+                                <i class="bi bi-file-earmark-pdf text-danger"></i>
+                                <a id="song-pdf-link" href="#" target="_blank" rel="noopener">Huidige PDF bekijken</a>
+                                <button type="button" class="btn btn-xs btn-outline-danger ms-2" onclick="removePdf()">
+                                    <i class="bi bi-trash"></i> Verwijderen
+                                </button>
+                            </div>
+                            <input type="file" id="song-pdf-file" class="form-control" accept="application/pdf,.pdf">
+                        </div>
                     </div>
                 </form>
             </div>
@@ -284,6 +297,8 @@ function openAddSong() {
     $("#song-drum-notation").val("");
     $("#song-lyrics").val("");
     $("#song-chords").val("");
+    $("#song-pdf-file").val("");
+    $("#song-pdf-current").hide();
     $("#drum-preview").hide().empty();
     $("#song-duplicate-warning").hide();
     $("#search-results").empty();
@@ -307,6 +322,13 @@ function openEditSong(i) {
     $("#song-drum-notation").val(s.drum_notation || "");
     $("#song-lyrics").val(s.lyrics || "");
     $("#song-chords").val(s.chords || "");
+    $("#song-pdf-file").val("");
+    if (s.pdf_path) {
+        $("#song-pdf-link").attr("href", "api/pdf.php?song_id=" + s.id);
+        $("#song-pdf-current").show();
+    } else {
+        $("#song-pdf-current").hide();
+    }
     $("#song-duplicate-warning").hide();
     $("#search-results").empty();
     refreshDrumPreview(s.drum_notation || "");
@@ -354,12 +376,56 @@ function saveSong() {
     };
     if (!data.title || !data.artist) { alert("Titel en artiest zijn verplicht."); return; }
     $.post("api/songs.php", data, function(r) {
-        if (r.ok) {
-            bootstrap.Modal.getInstance("#songModal").hide();
-            loadSongsTable();
-        } else { alert(r.error || "Fout bij opslaan"); }
+        if (!r.ok) { alert(r.error || "Fout bij opslaan"); return; }
+        var file = document.getElementById("song-pdf-file").files[0];
+        if (file) {
+            uploadPdf(r.id, file, finishSave, function(err) {
+                alert("Nummer opgeslagen, maar PDF-upload mislukt: " + err);
+                finishSave();
+            });
+        } else {
+            finishSave();
+        }
     }, "json").fail(function(xhr) {
         alert("Opslaan mislukt (HTTP " + xhr.status + "): " + (xhr.responseText || "onbekende fout"));
+    });
+}
+
+function finishSave() {
+    bootstrap.Modal.getInstance("#songModal").hide();
+    loadSongsTable();
+}
+
+/* PDF uploaden via multipart (CSRF-header wordt door ajaxSend toegevoegd). */
+function uploadPdf(songId, file, onOk, onErr) {
+    var fd = new FormData();
+    fd.append("song_id", songId);
+    fd.append("pdf", file);
+    $.ajax({
+        url: "api/pdf.php", type: "POST", data: fd,
+        processData: false, contentType: false, dataType: "json"
+    }).done(function(r) {
+        if (r.ok) { if (onOk) onOk(); }
+        else      { if (onErr) onErr(r.error || "onbekende fout"); }
+    }).fail(function(xhr) {
+        if (onErr) onErr("HTTP " + xhr.status);
+    });
+}
+
+/* PDF verwijderen bij het nummer dat in het formulier open staat. */
+function removePdf() {
+    var id = $("#song-id").val();
+    if (!id) { $("#song-pdf-file").val(""); $("#song-pdf-current").hide(); return; }
+    if (!confirm("PDF verwijderen?")) return;
+    $.ajax({
+        url: "api/pdf.php", type: "DELETE",
+        data: JSON.stringify({ song_id: id }),
+        contentType: "application/json", dataType: "json"
+    }).done(function(r) {
+        if (r.ok) { $("#song-pdf-current").hide(); $("#song-pdf-file").val(""); loadSongsTable(); }
+        else      { alert(r.error || "Verwijderen mislukt"); }
+    }).fail(function(xhr) {
+        alert("Verwijderen mislukt (HTTP " + xhr.status + ")");
     });
 }
 

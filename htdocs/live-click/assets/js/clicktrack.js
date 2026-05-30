@@ -173,6 +173,45 @@ function fitDrumSvg() {
 
 /* Id van het momenteel geselecteerde nummer (gebruikt door fetchLyrics). */
 var _currentSongId = null;
+/* Id van het nummer waarvan een PDF beschikbaar is (null = geen). */
+var _currentPdf = null;
+
+/* ── PDF-tab: laat de placeholder/iframe zien voor dit nummer ── */
+function _renderPdf(song) {
+    var frame = document.getElementById('detail-pdf-frame');
+    var empty = document.getElementById('detail-pdf-empty');
+    if (!frame) return;
+
+    frame.removeAttribute('src');
+    frame.style.display = 'none';
+
+    if (song && song.pdf_path) {
+        _currentPdf = song.id;
+        if (empty) empty.style.display = 'none';
+        // Direct laden als het PDF-tabblad al open staat, anders lui via shown.bs.tab
+        var btn = document.getElementById('tab-pdf-btn');
+        if (btn && btn.classList.contains('active')) loadPdfFrame();
+    } else {
+        _currentPdf = null;
+        if (empty) {
+            var lbl = empty.querySelector('span');
+            if (lbl) lbl.textContent = song ? 'Geen PDF voor dit nummer' : 'Selecteer een nummer';
+            empty.style.display = '';
+        }
+    }
+}
+
+/* Laadt de PDF in de iframe (1x, lui). Aangeroepen bij openen PDF-tab. */
+function loadPdfFrame() {
+    var frame = document.getElementById('detail-pdf-frame');
+    var empty = document.getElementById('detail-pdf-empty');
+    if (!frame || !_currentPdf) return;
+    if (!frame.getAttribute('src')) {
+        frame.src = 'api/pdf.php?song_id=' + _currentPdf;
+        frame.style.display = '';
+        if (empty) empty.style.display = 'none';
+    }
+}
 
 /* ── Songtekst-tab vullen / lege staat tonen ── */
 function _renderLyrics(song) {
@@ -219,6 +258,9 @@ function selectSong(song) {
             if (chordsEmpty) chordsEmpty.style.display = '';
         }
     }
+
+    // PDF-tab (bladmuziek)
+    _renderPdf(song);
 
     // Notities-tab
     var descEl    = document.getElementById('detail-desc');

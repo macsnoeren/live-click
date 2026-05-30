@@ -126,10 +126,12 @@ require APP_ROOT . '/includes/header.php';
                     </div>
                 </div>
 
-                <!-- PDF (toekomst) -->
-                <div class="tab-pane fade db-pane" id="tab-pdf" role="tabpanel">
-                    <div class="db-pane-empty">
-                        <i class="bi bi-file-earmark-pdf"></i><span>PDF-weergave komt binnenkort</span>
+                <!-- PDF (bladmuziek) -->
+                <div class="tab-pane fade db-pane db-pane-pdf" id="tab-pdf" role="tabpanel">
+                    <iframe id="detail-pdf-frame" class="db-pdf-frame" title="Bladmuziek (PDF)"
+                            style="display:none"></iframe>
+                    <div id="detail-pdf-empty" class="db-pane-empty">
+                        <i class="bi bi-file-earmark-pdf"></i><span>Selecteer een nummer</span>
                     </div>
                 </div>
             </div>
@@ -150,6 +152,8 @@ $(function() {
     $(window).on("resize", function() {
         if (document.getElementById("tab-drum-btn").classList.contains("active")) fitDrumSvg();
     });
+    // PDF pas laden zodra het PDF-tabblad geopend wordt (bespaart bandbreedte)
+    $("#tab-pdf-btn").on("shown.bs.tab", loadPdfFrame);
 });
 </script>';
 require APP_ROOT . '/includes/footer.php';
