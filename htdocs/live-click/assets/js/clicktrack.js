@@ -147,119 +147,85 @@ function ctToggleSound() {
     if (_ct.soundEnabled) ctInitAudio();
 }
 
-/* ── Hulpfunctie: pas de SVG-grootte aan na het injecteren ── */
-function _applySvgSizing(drumDiv, toggleBtn, drumWrap, drumChevron) {
-    var svg = drumDiv ? drumDiv.querySelector('svg') : null;
-    if (!svg) return;
+/* ── Pas de drum-SVG passend in het drum-tabblad ──
+ * Wordt aangeroepen na het injecteren van de SVG, bij het openen van het
+ * drum-tabblad (shown.bs.tab) en bij resize. Meet de beschikbare hoogte van
+ * het tabpaneel; als het tabblad nog verborgen is (clientHeight 0) blijft de
+ * natuurlijke hoogte staan en sizen we opnieuw zodra het zichtbaar wordt. */
+function fitDrumSvg() {
+    var pane = document.getElementById('tab-drum');
+    var svg  = pane ? pane.querySelector('svg') : null;
+    if (!pane || !svg) return;
 
-    var natH     = parseInt(svg.getAttribute('data-natural-h') || '0', 10);
-    var isTablet = window.matchMedia('(max-width: 991.98px)').matches;
+    var natH   = parseInt(svg.getAttribute('data-natural-h') || '0', 10);
+    var cs     = getComputedStyle(pane);
+    var avail  = pane.clientHeight
+               - (parseFloat(cs.paddingTop)    || 0)
+               - (parseFloat(cs.paddingBottom) || 0);
 
-    if (isTablet) {
-        // Tablet: kolom scrollt mee — gebruik de natuurlijke hoogte, nooit afknippen.
-        if (natH > 0) svg.style.height = natH + 'px';
-        svg.style.width = 'auto';
-    } else {
-        // Desktop: rechterkolom heeft vaste hoogte — bereken beschikbare ruimte.
-        // Meet VOORDAT drumWrap zichtbaar is, zodat de kaart nog niet vergroot is.
-        var navH      = parseInt(getComputedStyle(document.documentElement)
-                            .getPropertyValue('--nav-h')) || 0;
-        var rightCol  = document.querySelector('.db-col-right');
-        var detCard   = document.getElementById('song-detail-card');
-        var colH      = rightCol ? rightCol.clientHeight : (window.innerHeight - navH);
-        var fixedDetH = detCard  ? detCard.offsetHeight  : 0;
-        var togH      = toggleBtn ? toggleBtn.offsetHeight : 28;
-        var minSongs  = 120; // minimaal zichtbaar gedeelte van de songlijst
-        var padding   = 40;  // gaps + drumDiv-padding + kaartborders
-
-        var available = colH - fixedDetH - togH - minSongs - padding;
-
-        if (natH > 0 && available > 0 && natH > available) {
-            svg.style.height = Math.max(60, available) + 'px';
-        } else if (natH > 0) {
-            svg.style.height = natH + 'px';
-        }
-        svg.style.width = 'auto';
+    if (natH > 0) {
+        svg.style.height = (avail > 40 && natH > avail)
+            ? Math.max(60, Math.floor(avail)) + 'px'
+            : natH + 'px';
     }
-
-    // Toon sectie geopend
-    drumDiv.style.display = '';
-    if (drumWrap)    drumWrap.style.display  = '';
-    if (drumChevron) drumChevron.className   = 'bi bi-chevron-down';
-    if (toggleBtn)   toggleBtn.classList.add('open');
+    svg.style.width = 'auto';
 }
 
-/* ── Selecteer een nummer (vanuit setlist of "alle nummers") ── */
+/* ── Selecteer een nummer (vanuit setlist of "Alle Nummers") ── */
 function selectSong(song) {
     _ct.bpm = parseInt(song.bpm, 10) || _ct.bpm;
 
-    // Navigatiebalk: naam bijwerken
+    // Navigatiebalk (header): titel — artiest. BPM volgt via de click track.
     var songEl = document.getElementById('ct-song');
-    if (songEl) songEl.textContent = song.title + ' — ' + song.artist;
+    if (songEl) songEl.textContent = song.title + (song.artist ? ' — ' + song.artist : '');
 
-    // Detailkaart invullen
-    var card = document.getElementById('song-detail-card');
-    if (card) {
-        card.style.display = '';
-
-        document.getElementById('detail-title').textContent  = song.title;
-        document.getElementById('detail-artist').textContent = song.artist;
-        document.getElementById('detail-bpm').textContent    = song.bpm || '--';
-
-        // Start + duur
-        var startsWrap = document.getElementById('detail-starts-wrap');
-        var startsEl   = document.getElementById('detail-starts');
-        var durEl      = document.getElementById('detail-duration');
-        if (song.starts || song.duration) {
-            startsEl.textContent     = song.starts || '';
-            durEl.textContent        = song.duration || '';
-            startsWrap.style.display = '';
-        } else {
-            startsWrap.style.display = 'none';
-        }
-
-        // Notities / beschrijving
-        var descEl = document.getElementById('detail-desc');
+    // Notities-tab
+    var descEl    = document.getElementById('detail-desc');
+    var descEmpty = document.getElementById('detail-notes-empty');
+    if (descEl) {
         if (song.description && song.description.trim()) {
             descEl.textContent   = song.description;
             descEl.style.display = '';
+            if (descEmpty) descEmpty.style.display = 'none';
         } else {
             descEl.style.display = 'none';
-        }
-
-        // Drumstructuur SVG (inklapbaar, standaard geopend)
-        var drumWrap    = document.getElementById('detail-drum-wrap');
-        var drumDiv     = document.getElementById('detail-drum');
-        var drumChevron = document.getElementById('detail-drum-chevron');
-        var toggleBtn   = document.getElementById('detail-drum-toggle');
-
-        if (drumDiv) {
-            // Reset
-            drumDiv.innerHTML     = '';
-            drumDiv.style.display = 'none';
-            if (drumWrap)    drumWrap.style.display  = 'none';
-            if (drumChevron) drumChevron.className   = 'bi bi-chevron-right';
-            if (toggleBtn)   toggleBtn.classList.remove('open');
-
-            if (song.drum_svg) {
-                // SVG is beschikbaar in de cache — geen netwerk nodig.
-                drumDiv.innerHTML = song.drum_svg;
-                _applySvgSizing(drumDiv, toggleBtn, drumWrap, drumChevron);
-
-            } else if (song.drum_notation) {
-                // Fallback: genereer via server (vereist internetverbinding).
-                $.ajax({
-                    url: 'api/drum_preview.php', type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({ notation: song.drum_notation }),
-                    dataType: 'json',
-                    success: function(r) {
-                        if (!r.ok || !r.svg) return;
-                        drumDiv.innerHTML = r.svg;
-                        _applySvgSizing(drumDiv, toggleBtn, drumWrap, drumChevron);
-                    }
-                });
+            if (descEmpty) {
+                var lbl = descEmpty.querySelector('span');
+                if (lbl) lbl.textContent = 'Geen notities';
+                descEmpty.style.display = '';
             }
+        }
+    }
+
+    // Drumstructuur-tab
+    var drumDiv   = document.getElementById('detail-drum');
+    var drumEmpty = document.getElementById('detail-drum-empty');
+    if (drumDiv) {
+        drumDiv.innerHTML     = '';
+        drumDiv.style.display = 'none';
+        if (drumEmpty) drumEmpty.style.display = '';
+
+        if (song.drum_svg) {
+            // SVG zit in de cache — geen netwerk nodig.
+            drumDiv.innerHTML     = song.drum_svg;
+            drumDiv.style.display = '';
+            if (drumEmpty) drumEmpty.style.display = 'none';
+            fitDrumSvg();
+        } else if (song.drum_notation) {
+            // Fallback: genereer via server (vereist internetverbinding).
+            $.ajax({
+                url: 'api/drum_preview.php', type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ notation: song.drum_notation }),
+                dataType: 'json',
+                success: function(r) {
+                    if (!r.ok || !r.svg) return;
+                    drumDiv.innerHTML     = r.svg;
+                    drumDiv.style.display = '';
+                    if (drumEmpty) drumEmpty.style.display = 'none';
+                    fitDrumSvg();
+                }
+            });
         }
     }
 
@@ -267,23 +233,10 @@ function selectSong(song) {
     ctStop();
     setTimeout(function() { ctStart(song.bpm); }, 50);
 
-    // Markeer actief nummer in de setlist
+    // Markeer actief nummer in de lijst
     document.querySelectorAll('#setlist-songs .list-group-item').forEach(function(el) {
         el.classList.remove('selected');
     });
     var active = document.querySelector('#setlist-songs [data-id="' + song.id + '"]');
     if (active) active.classList.add('selected');
-}
-
-/* ── Toggle inklapbare drumstructuur ── */
-function toggleDrumSection() {
-    var drumDiv = document.getElementById('detail-drum');
-    var chevron = document.getElementById('detail-drum-chevron');
-    var btn     = document.getElementById('detail-drum-toggle');
-    if (!drumDiv) return;
-
-    var open = drumDiv.style.display !== 'none';
-    drumDiv.style.display = open ? 'none' : '';
-    if (chevron) chevron.className = open ? 'bi bi-chevron-right' : 'bi bi-chevron-down';
-    if (btn)     btn.classList.toggle('open', !open);
 }

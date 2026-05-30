@@ -640,8 +640,8 @@ body.page-dashboard #page-content {
 }
 
 .db-col-left {
-    flex: 0 0 33%;
-    min-width: 0;
+    flex: 0 0 30%;
+    min-width: 240px;
     display: flex;
     flex-direction: column;
 }
@@ -669,6 +669,79 @@ body.page-dashboard #page-content {
     overflow-y: auto;
 }
 
+/* =========================================
+   Dashboard detailkaart met tabs (notities / drumstructuur)
+   ========================================= */
+.db-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 8px;
+    flex-shrink: 0;
+}
+
+.db-tabs {
+    border-bottom: none;
+    flex-wrap: nowrap;
+}
+.db-tabs .nav-link {
+    color: #888;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 9px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.db-tabs .nav-link:hover { color: #ddd; }
+.db-tabs .nav-link.active {
+    color: #fff;
+    background: transparent;
+    border-bottom: 2px solid var(--accent);
+}
+.db-tabs .nav-link .bi { font-size: 0.85rem; margin-right: 3px; }
+
+/* Tab-inhoud vult de resterende hoogte; het actieve paneel scrollt */
+.db-tab-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+}
+.db-tab-content > .tab-pane { width: 100%; }
+.db-tab-content > .tab-pane.active {
+    display: flex;
+    flex-direction: column;
+}
+
+.db-pane {
+    padding: 14px 16px;
+    overflow: auto;
+}
+.db-notes {
+    white-space: pre-wrap;
+    color: #ddd;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    word-break: break-word;
+}
+.db-drum { overflow: auto; }
+
+/* Lege staat binnen een tab */
+.db-pane-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #555;
+    font-size: 0.9rem;
+}
+.db-pane-empty .bi { font-size: 2rem; opacity: 0.5; }
+
 @media (max-width: 991.98px) {
     .db-wrap {
         flex-direction: column;
@@ -691,5 +764,14 @@ body.page-dashboard #page-content {
         height: auto;
         overflow-y: visible;   /* geen eigen scroll op tablet */
         min-height: 0;
+    }
+
+    /* Detailkaart krijgt op tablet/mobiel een vaste hoogte zodat de tabs
+       (notities/drum) bruikbaar blijven binnen de pagina-scroll. */
+    .db-col-right { flex: none; }
+    .db-col-right .db-card {
+        flex: none;
+        height: 70vh;
+        min-height: 320px;
     }
 }

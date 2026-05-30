@@ -30,74 +30,61 @@ require APP_ROOT . '/includes/header.php';
 
 <div class="db-wrap">
 
-    <!-- Left: setlist -->
+    <!-- Left: setlist (incl. virtuele "Alle Nummers") + zoeken -->
     <div class="db-col-left">
         <div class="card db-card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>
-                    <i class="bi bi-list-ol"></i> Actieve setlist
-                    <span id="sl-dash-dur" class="badge bg-secondary ms-2" style="display:none"></span>
-                </span>
-                <select id="setlist-select" class="form-select form-select-sm w-auto"
-                        onchange="loadSetlist(this.value)">
-                    <option value="">— kies setlist —</option>
-                </select>
+            <div class="card-header db-setlist-header">
+                <div class="d-flex align-items-center gap-2">
+                    <select id="setlist-select" class="form-select form-select-sm flex-grow-1"
+                            onchange="loadSetlist(this.value)">
+                        <option value="all">Alle Nummers</option>
+                    </select>
+                    <span id="sl-dash-dur" class="badge bg-secondary" style="display:none"></span>
+                </div>
+                <input type="search" id="dash-search" class="form-control form-control-sm mt-2"
+                       placeholder="Zoek nummer...">
             </div>
             <div id="setlist-songs" class="list-group list-group-flush db-list">
-                <div class="list-group-item text-muted">Selecteer een setlist</div>
+                <div class="list-group-item text-muted">Laden...</div>
             </div>
         </div>
     </div>
 
-    <!-- Right: song detail + all songs -->
+    <!-- Right: notities / drumstructuur in tabs (titel/BPM/artiest staan in de header) -->
     <div class="db-col-right">
+        <div class="card db-card db-detail-card" id="song-detail-card">
+            <div class="card-header db-detail-header">
+                <ul class="nav nav-tabs db-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="tab-notes-btn" data-bs-toggle="tab"
+                                data-bs-target="#tab-notes" type="button" role="tab">
+                            <i class="bi bi-card-text"></i> Notities
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-drum-btn" data-bs-toggle="tab"
+                                data-bs-target="#tab-drum" type="button" role="tab">
+                            <i class="bi bi-music-note-list"></i> Drumstructuur
+                        </button>
+                    </li>
+                </ul>
+            </div>
 
-        <div class="card" id="song-detail-card" style="display:none!important">
-            <div class="card-body py-2 px-3">
-
-                <!-- Top row: title / artist / meta on left, BPM on right -->
-                <div class="d-flex align-items-start gap-3">
-                    <div class="flex-grow-1 min-w-0">
-                        <h4 id="detail-title" class="mb-0 fw-bold text-white text-truncate"></h4>
-                        <div class="text-muted small mt-1" id="detail-artist"></div>
-                        <div class="small mt-1" id="detail-starts-wrap" style="display:none">
-                            <span class="text-muted">Start:</span>
-                            <strong id="detail-starts"></strong>
-                            <span id="detail-duration" class="text-muted ms-2"></span>
-                        </div>
-                    </div>
-                    <div class="text-end flex-shrink-0">
-                        <div class="bpm-big" id="detail-bpm">--</div>
-                        <div class="text-muted" style="font-size:0.7rem">BPM</div>
+            <div class="tab-content db-tab-content">
+                <div class="tab-pane fade show active db-pane" id="tab-notes" role="tabpanel">
+                    <div id="detail-desc" class="db-notes" style="display:none"></div>
+                    <div id="detail-notes-empty" class="db-pane-empty">
+                        <i class="bi bi-card-text"></i><span>Selecteer een nummer</span>
                     </div>
                 </div>
-
-                <!-- Notes / description -->
-                <div id="detail-desc" class="mt-2" style="display:none;font-size:0.82rem;color:#ccc;white-space:pre-wrap;border-left:2px solid #333;padding-left:8px"></div>
-
-                <!-- Drum structure SVG (inklapbaar) -->
-                <div id="detail-drum-wrap" class="mt-2" style="display:none">
-                    <button type="button" id="detail-drum-toggle" class="drum-toggle-btn" onclick="toggleDrumSection()">
-                        <i class="bi bi-chevron-right" id="detail-drum-chevron"></i>
-                        <span>Drumstructuur</span>
-                    </button>
-                    <div id="detail-drum" style="display:none;background:#0b0b0b;border:1px solid #222;border-top:none;border-radius:0 0 5px 5px;padding:8px 6px;overflow-x:auto"></div>
+                <div class="tab-pane fade db-pane" id="tab-drum" role="tabpanel">
+                    <div id="detail-drum" class="db-drum" style="display:none"></div>
+                    <div id="detail-drum-empty" class="db-pane-empty">
+                        <i class="bi bi-music-note-list"></i><span>Geen drumstructuur</span>
+                    </div>
                 </div>
-
             </div>
         </div>
-
-        <div class="card db-card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-music-note-beamed"></i> Alle nummers</span>
-                <input type="search" id="song-search" class="form-control form-control-sm"
-                       style="width:180px" placeholder="Zoek nummer...">
-            </div>
-            <div id="all-songs" class="list-group list-group-flush db-list">
-                <div class="list-group-item text-muted">Laden...</div>
-            </div>
-        </div>
-
     </div>
 </div>
 
@@ -105,9 +92,15 @@ require APP_ROOT . '/includes/header.php';
 $extraScripts = '<script>
 var BAND_ID = ' . ($user['band_id'] ? (int)$user['band_id'] : 'null') . ';
 $(function() {
-    loadAllSongs();
+    loadAllSongs();        // vult de cache voor "Alle Nummers" + zoeken
     loadSetlistDropdown();
-    $("#song-search").on("input", function() { filterSongs($(this).val()); });
+    loadSetlist("all");    // standaard: toon alle nummers
+    $("#dash-search").on("input", function() { filterPanel($(this).val()); });
+    // Drum-SVG passend maken zodra het tabblad zichtbaar wordt / bij resize
+    $("#tab-drum-btn").on("shown.bs.tab", fitDrumSvg);
+    $(window).on("resize", function() {
+        if (document.getElementById("tab-drum-btn").classList.contains("active")) fitDrumSvg();
+    });
 });
 </script>';
 require APP_ROOT . '/includes/footer.php';

@@ -110,21 +110,19 @@ function selectSongById(idOrEl) {
 }
 
 /* =========================================
-   Dashboard: alle nummers
+   Dashboard: alle nummers (vult de cache)
+   Wordt getoond als de virtuele setlist "Alle Nummers".
    ========================================= */
 function loadAllSongs() {
     var bandId = typeof BAND_ID !== 'undefined' ? BAND_ID : null;
-    if (!bandId) {
-        $('#all-songs').html('<div class="list-group-item text-muted small">Je bent nog niet aan een band gekoppeld.</div>');
-        return;
-    }
+    if (!bandId) return;
 
     // Toon gecachede data meteen (werkt ook zonder netwerk)
     var cached = lgLoad('songs', bandId);
     if (cached) {
         _allSongsCache = cached;
         _indexSongs(cached);
-        renderAllSongs(cached);
+        if (_panelIsAll) showAllSongs();
     }
 
     // Haal verse data op op de achtergrond
@@ -133,12 +131,12 @@ function loadAllSongs() {
             _allSongsCache = data.songs || [];
             lgSave('songs', bandId, _allSongsCache);
             _indexSongs(_allSongsCache);
-            renderAllSongs(_allSongsCache);
+            if (_panelIsAll) showAllSongs();
             lgSetOffline(false);
         })
         .fail(function() {
-            if (!cached) {
-                $('#all-songs').html(
+            if (!cached && _panelIsAll) {
+                $('#setlist-songs').html(
                     '<div class="list-group-item text-danger small">' +
                     '<i class="bi bi-wifi-off me-1"></i>Geen verbinding en geen lokale cache.</div>'
                 );
@@ -147,36 +145,23 @@ function loadAllSongs() {
         });
 }
 
-function renderAllSongs(songs) {
-    var c = $('#all-songs');
-    c.empty();
-    if (!songs.length) {
-        c.append('<div class="list-group-item text-muted">Geen nummers gevonden</div>');
+/* Toon alle nummers (alfabetisch) als virtuele setlist in het linker paneel. */
+function showAllSongs() {
+    _panelIsAll = true;
+    var sel = document.getElementById('setlist-select');
+    if (sel) sel.value = 'all';
+
+    // Nog niets geladen — toon "Laden..." (loadAllSongs roept ons opnieuw aan).
+    if (_allSongsCache === null) {
+        $('#sl-dash-dur').hide();
+        $('#setlist-songs').html('<div class="list-group-item text-muted">Laden...</div>');
         return;
     }
-    songs.forEach(function(s) {
-        c.append(
-            '<button class="list-group-item list-group-item-action list-group-item-dark' +
-            ' d-flex justify-content-between align-items-center py-2"' +
-            ' data-id="' + s.id + '" onclick="selectSongById(this)">' +
-            '<span>' +
-            '<span class="fw-semibold">'        + escHtml(s.title)  + '</span>' +
-            '<span class="text-muted small ms-2">' + escHtml(s.artist) + '</span>' +
-            (s.starts ? '<span class="text-muted small ms-2">▶ ' + escHtml(s.starts) + '</span>' : '') +
-            '</span>' +
-            '<span class="bpm-badge">' + (s.bpm || '--') + '</span>' +
-            '</button>'
-        );
-    });
-}
 
-function filterSongs(q) {
-    if (!_allSongsCache) return;
-    q = (q || '').toLowerCase();
-    var filtered = _allSongsCache.filter(function(s) {
-        return !q || s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q);
+    var songs = _allSongsCache.slice().sort(function(a, b) {
+        return (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
     });
-    renderAllSongs(filtered);
+    renderSetlistPanel(songs);
 }
 
 /* =========================================
@@ -217,13 +202,17 @@ function loadSetlistDropdown() {
 }
 
 function _renderSetlistOptions(lists) {
-    // Nav-dropdown
+    // Nav-dropdown — met "Alle Nummers" bovenaan
     var menu = $('#setlist-dropdown');
     if (menu.length) {
         menu.empty();
-        if (!lists.length) {
-            menu.append('<li><a class="dropdown-item text-muted" href="#">Nog geen setlists</a></li>');
-        } else {
+        menu.append(
+            '<li><a class="dropdown-item" href="#"' +
+            ' onclick="loadSetlist(\'all\');return false;">' +
+            '<i class="bi bi-collection me-1"></i>Alle Nummers</a></li>'
+        );
+        if (lists.length) {
+            menu.append('<li><hr class="dropdown-divider"></li>');
             lists.forEach(function(sl) {
                 menu.append(
                     '<li><a class="dropdown-item" href="#"' +
@@ -234,7 +223,7 @@ function _renderSetlistOptions(lists) {
         }
     }
 
-    // Dashboard select
+    // Dashboard select — eerste optie ("Alle Nummers") blijft staan
     var sel = $('#setlist-select');
     if (sel.length) {
         var curVal = sel.val();
@@ -250,6 +239,9 @@ function _renderSetlistOptions(lists) {
    Dashboard: laad setlist in linker paneel
    ========================================= */
 function loadSetlist(id) {
+    // Virtuele setlist "Alle Nummers"
+    if (id === 'all') { showAllSongs(); return; }
+
     id = parseInt(id, 10);
     if (!id) return;
 
@@ -271,18 +263,25 @@ function loadSetlist(id) {
 }
 
 function _applySetlist(sl) {
+    _panelIsAll = false;
+    var sel = document.getElementById('setlist-select');
+    if (sel) sel.value = sl.id;
     var songEl = document.getElementById('ct-song');
     if (songEl) songEl.textContent = sl.name;
     renderSetlistPanel(sl.songs || []);
 }
 
-function renderSetlistPanel(songs) {
-    var c = $('#setlist-songs');
-    c.empty();
+/* Het momenteel getoonde nummeroverzicht (setlist of "Alle Nummers"). */
+var _panelSongs = [];
+var _panelIsAll = true;
 
-    var dur   = calcSetlistDuration(songs);
+function renderSetlistPanel(songs) {
+    _panelSongs = songs || [];
+
+    // Duur-badge: alleen tonen bij een echte setlist, niet bij "Alle Nummers"
     var badge = $('#sl-dash-dur');
-    if (badge.length && songs.length) {
+    if (badge.length && _panelSongs.length && !_panelIsAll) {
+        var dur     = calcSetlistDuration(_panelSongs);
         var durTxt  = (dur.estimated ? '~' : '') + fmtSecs(dur.totalSecs);
         var estNote = dur.estimated
             ? ' <i class="bi bi-dash-circle text-warning ms-1" title="'
@@ -294,13 +293,29 @@ function renderSetlistPanel(songs) {
         badge.hide();
     }
 
+    // Zoekveld leegmaken bij wisselen van lijst
+    var search = document.getElementById('dash-search');
+    if (search) search.value = '';
+
+    _renderPanelItems(_panelSongs);
+}
+
+/* Tekent de nummerknoppen in het linker paneel (zonder de badge/zoek te resetten). */
+function _renderPanelItems(songs) {
+    var c = $('#setlist-songs');
+    c.empty();
+
     if (!songs.length) {
-        c.append('<div class="list-group-item text-muted">Lege setlist</div>');
+        c.append('<div class="list-group-item text-muted">' +
+                 (_panelIsAll ? 'Geen nummers gevonden' : 'Lege setlist') + '</div>');
         return;
     }
+
     songs.forEach(function(s, i) {
         // Index elk nummer zodat selectSongById het kan vinden
         _songById[s.id] = s;
+
+        var numHtml = _panelIsAll ? '' : '<span class="sl-num">' + (i + 1) + '.</span>';
 
         var startsRow = s.starts
             ? '<div class="sl-starts"><i class="bi bi-play-fill"></i>' + escHtml(s.starts) + '</div>'
@@ -311,7 +326,7 @@ function renderSetlistPanel(songs) {
             ' data-id="' + s.id + '" onclick="selectSongById(this)">' +
             '<span class="sl-main">' +
             '<span class="sl-title-row">' +
-            '<span class="sl-num">'    + (i + 1)           + '.</span>' +
+            numHtml +
             '<span class="sl-title">'  + escHtml(s.title)  + '</span>' +
             '<span class="sl-artist">' + escHtml(s.artist) + '</span>' +
             '</span>' +
@@ -321,4 +336,15 @@ function renderSetlistPanel(songs) {
             '</button>'
         );
     });
+}
+
+/* Filtert het huidige paneel (setlist of "Alle Nummers") op titel/artiest. */
+function filterPanel(q) {
+    q = (q || '').toLowerCase().trim();
+    if (!q) { _renderPanelItems(_panelSongs); return; }
+    var filtered = _panelSongs.filter(function(s) {
+        return (s.title  && s.title.toLowerCase().includes(q)) ||
+               (s.artist && s.artist.toLowerCase().includes(q));
+    });
+    _renderPanelItems(filtered);
 }
