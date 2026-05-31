@@ -88,6 +88,7 @@ if ($method === 'GET') {
                 'role'     => $m['role'],
                 'pubkey'   => $m['pubkey'] ?: null,
                 'has_key'  => (int)$m['has_key'] > 0,
+                'is_me'    => (int)$m['user_id'] === $userId,
             ];
         }
         $resp['members'] = $members;

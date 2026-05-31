@@ -352,6 +352,19 @@
             var withKey = members.filter(function (m) { return m.pubkey; });
             var without = members.filter(function (m) { return !m.pubkey; });
 
+            // De uitvoerende leider moet zelf een sleutel hebben, anders sluit
+            // hij zichzelf buiten (en kan de server de kluis niet aanzetten).
+            var meHasKey = members.some(function (m) { return m.is_me && m.pubkey; });
+            if (!meHasKey) {
+                throw new Error(
+                    'Je eigen versleutelingssleutel staat nog niet geregistreerd op de server. ' +
+                    'Log één keer uit en weer in (met je wachtwoord) zodat je sleutel wordt ' +
+                    'aangemaakt, en probeer het daarna opnieuw.');
+            }
+            if (!withKey.length) {
+                throw new Error('Nog geen enkel bandlid heeft een versleutelingssleutel.');
+            }
+
             return aesGenKey(true).then(function (bdk) {
                 // BDK voor elk lid met publieke sleutel inpakken
                 var jobs = withKey.map(function (m) {
