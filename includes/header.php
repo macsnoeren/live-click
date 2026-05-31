@@ -136,7 +136,8 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     <li><a class="dropdown-item" href="profile.php"><i class="bi bi-person-gear me-2"></i>Profiel &amp; beveiliging</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <form method="POST" action="logout.php" class="m-0">
+                        <form method="POST" action="logout.php" class="m-0"
+                              onsubmit="if(window.LGKeys)try{LGKeys.lock()}catch(e){}">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(csrfToken()) ?>">
                             <button type="submit" class="dropdown-item">
                                 <i class="bi bi-box-arrow-right me-2"></i>Uitloggen

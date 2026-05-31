@@ -167,7 +167,7 @@ function _doRedirect(): void {
 
         <?php else: ?>
         <!-- ── Credentials step ───────────────────────────────────────── -->
-        <form method="POST">
+        <form method="POST" id="login-cred-form">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
             <div class="mb-3">
                 <label class="form-label">Gebruikersnaam</label>
@@ -176,7 +176,7 @@ function _doRedirect(): void {
             </div>
             <div class="mb-3">
                 <label class="form-label">Wachtwoord</label>
-                <input type="password" name="password" class="form-control">
+                <input type="password" name="password" class="form-control" id="login-password">
             </div>
             <div class="mb-4 form-check">
                 <input type="checkbox" name="remember" value="1" id="remember-me" class="form-check-input"
@@ -198,5 +198,31 @@ function _doRedirect(): void {
     </div>
 </div>
 <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script>
+/* E2EE-sleutels (zie PRIVACY.md): het wachtwoord is nodig om in de browser de
+ * privésleutel te ontgrendelen. We bewaren het kortstondig in sessionStorage
+ * (zelfde origin, gaat nooit naar de server) zodat de eerste ingelogde pagina
+ * de kluis kan ontgrendelen; daarna wist de bootstrap het meteen. */
+(function () {
+    var in2fa = <?= $show2fa ? 'true' : 'false' ?>;
+    try {
+        // Verse login / uitgelogd: oude sleutel + wachtwoord opruimen.
+        // Tijdens de 2FA-stap NIET wissen — het wachtwoord uit stap 1 is nog nodig.
+        if (!in2fa) {
+            sessionStorage.removeItem('lg_priv');
+            sessionStorage.removeItem('lg_pw_tmp');
+        }
+        var form = document.getElementById('login-cred-form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                var pw = document.getElementById('login-password');
+                if (pw && pw.value) {
+                    try { sessionStorage.setItem('lg_pw_tmp', pw.value); } catch (e) {}
+                }
+            });
+        }
+    } catch (e) {}
+})();
+</script>
 </body>
 </html>

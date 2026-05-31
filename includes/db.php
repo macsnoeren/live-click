@@ -138,9 +138,45 @@ function initSchema(PDO $db): void {
     try { $db->exec('ALTER TABLE songs ADD COLUMN pdf_path TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE bands ADD COLUMN share_token TEXT'); } catch (PDOException $e) {}
     try { $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_bands_share_token ON bands(share_token) WHERE share_token IS NOT NULL'); } catch (PDOException $e) {}
+    // E2EE-sleutelmateriaal per gebruiker (zie PRIVACY.md). Allemaal nullable:
+    // een gebruiker krijgt pas sleutels bij de eerste login ná invoering.
+    //   kdf_salt             — salt voor PBKDF2 (wachtwoord → KEK)
+    //   pubkey               — publieke sleutel (klare tekst, SPKI/base64)
+    //   enc_privkey          — privésleutel versleuteld onder de KEK ({v,iv,ct} JSON)
+    //   enc_privkey_recovery — privésleutel versleuteld onder de recovery-KEK (fase 2)
+    //   recovery_salt        — salt voor de herstelcode (fase 2)
+    try { $db->exec('ALTER TABLE users ADD COLUMN kdf_salt TEXT'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE users ADD COLUMN pubkey TEXT'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE users ADD COLUMN enc_privkey TEXT'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE users ADD COLUMN enc_privkey_recovery TEXT'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE users ADD COLUMN recovery_salt TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_secret TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
+
+    // E2EE-kluis per band (zie PRIVACY.md, fase 2).
+    //   is_encrypted — staat de kluis aan voor deze band?
+    //   key_version  — volgnummer van de Band Data Key (voor rotatie)
+    try { $db->exec('ALTER TABLE bands ADD COLUMN is_encrypted INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE bands ADD COLUMN key_version INTEGER NOT NULL DEFAULT 1'); } catch (PDOException $e) {}
+
+    // De Band Data Key (BDK), per lid ingepakt met hun publieke sleutel.
+    // Eén rij per (band, lid, sleutelversie).
+    try {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS band_member_keys (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                band_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                wrapped_bdk TEXT NOT NULL,
+                key_version INTEGER NOT NULL DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (band_id) REFERENCES bands(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(band_id, user_id, key_version)
+            );
+        ");
+    } catch (PDOException $e) {}
 
     // Migratie bandrollen: zorg dat elke band minstens één leider heeft.
     // Bands zonder leider krijgen het oudste lidmaatschap (laagste band_members.id)

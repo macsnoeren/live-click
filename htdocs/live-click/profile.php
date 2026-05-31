@@ -165,10 +165,20 @@ function changePassword() {
     var current = $("#pw-current").val();
     var new1    = $("#pw-new1").val();
     var new2    = $("#pw-new2").val();
+
+    // E2EE: als er een sleutelpaar is, de privésleutel onder het NIEUWE
+    // wachtwoord herverpakken en meesturen (anders blijft de kluis op slot).
+    var prep = (window.LGKeys && new1 && new1 === new2)
+        ? LGKeys.rewrapForNewPassword(new1).catch(function () { return null; })
+        : Promise.resolve(null);
+
+    prep.then(function (keyMaterial) {
+    var payload = {action:"change_password", current:current, new1:new1, new2:new2};
+    if (keyMaterial) { payload.kdf_salt = keyMaterial.kdf_salt; payload.enc_privkey = keyMaterial.enc_privkey; }
     $.ajax({
         url: "api/profile.php", type: "POST",
         contentType: "application/json",
-        data: JSON.stringify({action:"change_password", current:current, new1:new1, new2:new2}),
+        data: JSON.stringify(payload),
         dataType: "json",
         success: function(r) {
             var el = $("#pw-alert");
@@ -185,6 +195,7 @@ function changePassword() {
                   .html(\'<i class="bi bi-exclamation-triangle me-1"></i>\' + escHtml(r.error || "Fout")).show();
             }
         }
+    });
     });
 }
 

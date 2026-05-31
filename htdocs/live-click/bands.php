@@ -101,6 +101,61 @@ require APP_ROOT . '/includes/header.php';
     </div>
 </div>
 
+<!-- Kluis aanzetten: bevestiging -->
+<div class="modal fade" id="vaultEnableModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-shield-lock"></i> Band versleutelen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Je staat op het punt de inhoud van <strong id="vault-band-name"></strong> end-to-end te versleutelen.</p>
+                <ul class="small text-muted">
+                    <li>Alleen bandleden kunnen de inhoud daarna nog lezen — de server niet.</li>
+                    <li>Leden zonder sleutel (nog nooit ingelogd sinds de update) krijgen later automatisch toegang.</li>
+                    <li>Je krijgt eenmalig een <strong>herstelcode</strong>; bewaar die goed.</li>
+                </ul>
+                <div id="vault-enable-alert" class="alert alert-danger py-2 small" style="display:none"></div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
+                <button type="button" class="btn btn-danger" id="vault-enable-confirm" onclick="confirmEnableVault()">
+                    <i class="bi bi-shield-lock"></i> Versleutelen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Herstelcode tonen (eenmalig) -->
+<div class="modal fade" id="recoveryModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-key"></i> Herstelcode</h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning py-2 small">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Bewaar deze code op een veilige plek (bv. wachtwoordmanager). Met deze code kun je
+                    je kluis openen als je je wachtwoord vergeet. Hij wordt <strong>maar één keer</strong> getoond.
+                </div>
+                <div id="recovery-code" class="font-monospace fs-5 text-center py-3"
+                     style="background:#1e1e1e;border:1px solid #2e2e2e;border-radius:6px;letter-spacing:0.1em"></div>
+                <button class="btn btn-outline-secondary btn-sm mt-2" onclick="copyRecoveryCode()">
+                    <i class="bi bi-clipboard"></i> Kopiëren
+                </button>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="loadBands()">
+                    <i class="bi bi-check"></i> Ik heb de code bewaard
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php
 $isAdmin = $user['role'] === 'admin';
 $extraScripts = '<script>
@@ -121,6 +176,19 @@ function loadBands() {
     $.get("api/bands.php", function(data) {
         _allBands = data.bands || [];
         renderBands(_allBands);
+        grantKeysToNewMembers();
+    });
+}
+
+// E2EE: deel als leider stil de BDK uit aan leden die nog geen sleutel hebben
+// (bv. iemand die zich na de uitnodiging pas later heeft aangemeld).
+function grantKeysToNewMembers() {
+    if (!window.LGVault || !window.LGKeys || LGKeys.keyState() !== "unlocked") return;
+    _allBands.forEach(function(b) {
+        if (b.is_encrypted != 1) return;
+        var amLeader = (b.members || []).some(function(m){ return m.id == _myUserId && m.role === "leader"; });
+        if (!amLeader && !_isAdmin) return;
+        LGVault.grantMissing(b.id).catch(function(){});
     });
 }
 
@@ -132,6 +200,62 @@ function loadAllUsers() {
 
 function isLeaderOf(b) {
     return (b.members || []).some(function(m) { return m.id == _myUserId && m.role === "leader"; });
+}
+
+// ---- E2EE: band versleutelen (zie PRIVACY.md) ----
+var _vaultBandId = null;
+
+function askEnableVault(bandId) {
+    if (!window.LGVault || !window.LGKeys) {
+        alert("Versleuteling is niet beschikbaar in deze browser (vereist HTTPS).");
+        return;
+    }
+    if (LGKeys.keyState() !== "unlocked") {
+        alert("Je kluis is nog niet ontgrendeld. Log opnieuw in met je wachtwoord en probeer het daarna nogmaals.");
+        return;
+    }
+    _vaultBandId = bandId;
+    var b = _allBands.find(function(x) { return x.id == bandId; });
+    $("#vault-band-name").text(b ? b.name : "deze band");
+    $("#vault-enable-alert").hide();
+    $("#vault-enable-confirm").prop("disabled", false);
+    new bootstrap.Modal("#vaultEnableModal").show();
+}
+
+function confirmEnableVault() {
+    var bandId = _vaultBandId;
+    if (!bandId) return;
+    $("#vault-enable-confirm").prop("disabled", true);
+
+    LGVault.enableVault(bandId).then(function(res) {
+        // Zorg dat er een herstelcode is; zo niet, genereer er één en toon die.
+        return fetch("api/keys.php", {credentials:"same-origin", headers:{Accept:"application/json"}})
+            .then(function(r){ return r.json(); })
+            .then(function(st) {
+                bootstrap.Modal.getInstance("#vaultEnableModal").hide();
+                if (res.without_keys && res.without_keys.length) {
+                    // Niet blokkerend — informeren is genoeg
+                    console.info("Leden zonder sleutel (krijgen later toegang):", res.without_keys);
+                }
+                if (st.ok && !st.has_recovery) {
+                    return LGKeys.setupRecovery().then(function(code) { showRecoveryCode(code); });
+                }
+                loadBands();
+            });
+    }).catch(function(e) {
+        $("#vault-enable-alert").text(e.message || "Versleutelen mislukt.").show();
+        $("#vault-enable-confirm").prop("disabled", false);
+    });
+}
+
+function showRecoveryCode(code) {
+    $("#recovery-code").text(code);
+    window._lgRecoveryCode = code;
+    new bootstrap.Modal("#recoveryModal").show();
+}
+
+function copyRecoveryCode() {
+    navigator.clipboard.writeText(window._lgRecoveryCode || "").catch(function(){});
 }
 
 function roleLabel(role) {
@@ -164,8 +288,12 @@ function renderBands(bands) {
         var isActive    = (b.id == ' . (int)($user['band_id'] ?? 0) . ');
         var amLeader    = isLeaderOf(b);
         var canManage   = amLeader || _isAdmin;
+        var isEncrypted = (b.is_encrypted == 1);
 
         var activeBadge = isActive ? \'<span class="badge bg-danger ms-2 align-middle" style="font-size:0.65rem">Actief</span>\' : \'\';
+        var vaultBadge  = isEncrypted
+            ? \' <i class="bi bi-shield-lock-fill text-success align-middle" title="End-to-end versleuteld" style="font-size:0.8rem"></i>\'
+            : \'\';
         var editBtn  = canManage
             ? \'<button class="btn btn-xs btn-outline-secondary" onclick="openEditBand(\' + i + \')" title="Bewerken"><i class="bi bi-pencil"></i></button>\'
             : \'\';
@@ -212,8 +340,17 @@ function renderBands(bands) {
         });
         if (!membersHtml) membersHtml = \'<span class="text-muted small">Geen leden</span>\';
 
+        var vaultRow = \'\';
+        if (canManage && window.LGVault) {
+            vaultRow = isEncrypted
+                ? \'<div class="px-3 py-2 small text-success"><i class="bi bi-shield-lock-fill me-1"></i>End-to-end versleuteld</div>\'
+                : \'<button class="btn btn-link btn-sm text-muted w-100 text-start px-3 py-2" onclick="askEnableVault(\' + b.id + \')"><i class="bi bi-shield-lock me-1"></i> Band versleutelen</button>\';
+        }
+
         var inviteFooter = canManage
             ? \'<div class="card-footer border-secondary p-0">\'
+              + vaultRow
+              + (vaultRow ? \'<div class="border-top border-secondary" style="border-top-style:dashed!important"></div>\' : \'\')
               + \'<button class="btn btn-link btn-sm text-muted w-100 text-start px-3 py-2" onclick="toggleInvite(\' + b.id + \')"><i class="bi bi-link-45deg me-1"></i> Uitnodigingslink</button>\'
               + \'<div id="invite-\' + b.id + \'" class="px-3 pb-3" style="display:none"></div>\'
               + \'<div class="border-top border-secondary" style="border-top-style:dashed!important">\'
@@ -227,7 +364,7 @@ function renderBands(bands) {
             + \'<div class="card h-100 d-flex flex-column">\'
             + \'<div class="card-body pb-2">\'
             + \'<div class="d-flex justify-content-between align-items-start mb-2">\'
-            + \'<h6 class="fw-bold mb-0">\' + escHtml(b.name) + activeBadge + \'</h6>\'
+            + \'<h6 class="fw-bold mb-0">\' + escHtml(b.name) + activeBadge + vaultBadge + \'</h6>\'
             + \'<div class="d-flex">\' + editBtn + leaveBtn + deleteBtn + \'</div>\'
             + \'</div>\'
             + (b.description ? \'<p class="text-muted small mb-2">\' + escHtml(b.description) + \'</p>\' : \'\')

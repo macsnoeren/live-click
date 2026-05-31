@@ -34,11 +34,25 @@ if ($action === 'change_password') {
         echo json_encode(['ok' => false, 'error' => 'Huidig wachtwoord onjuist.']); exit;
     }
 
-    $db->prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
-       ->execute([password_hash($new1, PASSWORD_DEFAULT), $userId]);
+    // E2EE: optioneel herverpakt sleutelmateriaal (zie PRIVACY.md). De client
+    // levert de privésleutel opnieuw versleuteld onder het nieuwe wachtwoord.
+    $newSalt = trim($data['kdf_salt'] ?? '');
+    $newEnc  = trim($data['enc_privkey'] ?? '');
+    $hasKeyMaterial = ($newSalt !== '' && $newEnc !== '');
+    if ($hasKeyMaterial && (strlen($newSalt) > 8000 || strlen($newEnc) > 8000)) {
+        echo json_encode(['ok' => false, 'error' => 'Ongeldig sleutelformaat.']); exit;
+    }
+
+    if ($hasKeyMaterial) {
+        $db->prepare('UPDATE users SET password_hash = ?, must_change_password = 0, kdf_salt = ?, enc_privkey = ? WHERE id = ?')
+           ->execute([password_hash($new1, PASSWORD_DEFAULT), $newSalt, $newEnc, $userId]);
+    } else {
+        $db->prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
+           ->execute([password_hash($new1, PASSWORD_DEFAULT), $userId]);
+    }
     // Clear force-change flag from session so the redirect stops
     unset($_SESSION['must_change_password']);
-    auditLog('user.password_change', 'user', $userId);
+    auditLog('user.password_change', 'user', $userId, ['rewrapped_keys' => $hasKeyMaterial]);
     echo json_encode(['ok' => true]); exit;
 }
 

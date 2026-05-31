@@ -22,6 +22,13 @@
 </script>
 <script src="assets/js/clicktrack.js?v=<?= filemtime(APP_ROOT . '/htdocs/live-click/assets/js/clicktrack.js') ?>"></script>
 <script src="assets/js/app.js?v=<?= filemtime(APP_ROOT . '/htdocs/live-click/assets/js/app.js') ?>"></script>
+<!-- E2EE: cryptomodule + sleutel-bootstrap (zie PRIVACY.md). Ontgrendelt de
+     privésleutel zodra die nodig is; faalt stil als versleuteling (nog) niet
+     in gebruik is. -->
+<script src="assets/js/crypto.js?v=<?= filemtime(APP_ROOT . '/htdocs/live-click/assets/js/crypto.js') ?>"></script>
+<script>
+if (window.LGKeys) { LGKeys.bootstrap().catch(function () {}); }
+</script>
 <?= $extraScripts ?? '' ?>
 <script>
 (function() {
