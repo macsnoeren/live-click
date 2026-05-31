@@ -17,7 +17,7 @@ $band = $stmt->fetch();
 if (!$band) { http_response_code(404); die('Link niet gevonden of verlopen.'); }
 
 // Setlists met nummers ophalen
-$stmt = $db->prepare('SELECT id, name FROM setlists WHERE band_id=? ORDER BY created_at DESC');
+$stmt = $db->prepare('SELECT id, name FROM setlists WHERE band_id=? ORDER BY name COLLATE NOCASE ASC');
 $stmt->execute([$band['id']]);
 $setlists = $stmt->fetchAll();
 
