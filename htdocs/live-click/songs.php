@@ -4,6 +4,7 @@ require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
 $user = currentUser();
 $canEdit = userCanEditBandContent((int)($user['band_id'] ?? 0));
+$bandEncrypted = bandIsEncrypted((int)($user['band_id'] ?? 0));
 $pageTitle = 'Nummers — LiveGig';
 require APP_ROOT . '/includes/header.php';
 ?>
@@ -247,14 +248,48 @@ $extraScripts = '<script>
 var _deleteSongId = null;
 var _songsList = [];
 var _canEdit = ' . ($canEdit ? 'true' : 'false') . ';
+var BAND_ID = ' . ($user['band_id'] ? (int)$user['band_id'] : 'null') . ';
+var BAND_ENCRYPTED = ' . ($bandEncrypted ? 'true' : 'false') . ';
 $(function() { loadSongsTable(); });
 
 function loadSongsTable() {
-    var bandId = ' . ($user['band_id'] ?? 'null') . ';
-    $.get("api/songs.php", {band_id: bandId}, function(data) {
-        _songsList = data.songs || [];
-        renderSongsTable(_songsList);
+    $.get("api/songs.php", {band_id: BAND_ID}, function(data) {
+        var raw = data.songs || [];
+        var decrypt = (window.LGVault && raw.some(function(s){ return s && s.enc_blob; }))
+            ? LGVault.decryptSongs(BAND_ID, raw) : Promise.resolve(raw);
+        decrypt.then(function(songs) {
+            _songsList = songs;
+            renderSongsTable(_songsList);
+            migratePlaintextSongs(songs);
+        });
     });
+}
+
+// E2EE: bestaande, nog niet-versleutelde nummers in een versleutelde band
+// omzetten naar enc_blob. Idempotent — eenmaal versleuteld worden ze overgeslagen.
+function migratePlaintextSongs(songs) {
+    if (!BAND_ENCRYPTED || !_canEdit || !window.LGVault) return;
+    if (LGKeys && LGKeys.keyState() !== "unlocked") return;
+    var todo = songs.filter(function(s){ return !s.enc_blob && (s.title || s.artist); });
+    if (!todo.length) return;
+    todo.reduce(function(p, s) {
+        return p.then(function() {
+            return LGVault.encryptSongFields(BAND_ID, s).then(function(blob) {
+                return $.ajax({ url: "api/songs.php", type: "POST", contentType: "application/json",
+                    data: JSON.stringify({ id: s.id, band_id: BAND_ID, enc_blob: blob }), dataType: "json" });
+            });
+        });
+    }, Promise.resolve()).then(function() { loadSongsTable(); }).catch(function() {});
+}
+
+/* Rendert de drumstructuur server-side naar SVG (client houdt de notatie geheim
+   bij een versleutelde band; de SVG gaat mee de blob in). */
+function renderDrumSvg(notation) {
+    notation = (notation || "").trim();
+    if (!notation) return Promise.resolve("");
+    return $.ajax({ url: "api/drum_preview.php", type: "POST", contentType: "application/json",
+        data: JSON.stringify({ notation: notation }), dataType: "json" })
+        .then(function(r) { return (r.ok && r.svg) ? r.svg : ""; }, function() { return ""; });
 }
 
 function renderSongsTable(songs) {
@@ -381,7 +416,8 @@ function saveSong() {
         band_id: ' . ($user['band_id'] ?? 'null') . '
     };
     if (!data.title || !data.artist) { alert("Titel en artiest zijn verplicht."); return; }
-    $.post("api/songs.php", data, function(r) {
+
+    function afterSave(r) {
         if (!r.ok) { alert(r.error || "Fout bij opslaan"); return; }
         var file = document.getElementById("song-pdf-file").files[0];
         if (file) {
@@ -392,9 +428,28 @@ function saveSong() {
         } else {
             finishSave();
         }
-    }, "json").fail(function(xhr) {
+    }
+    function saveFail(xhr) {
         alert("Opslaan mislukt (HTTP " + xhr.status + "): " + (xhr.responseText || "onbekende fout"));
-    });
+    }
+
+    if (BAND_ENCRYPTED && window.LGVault) {
+        // E2EE: drum-SVG renderen, alles in één versleutelde blob stoppen en
+        // alleen de blob versturen (geen plaintext-velden).
+        if (LGKeys && LGKeys.keyState() !== "unlocked") {
+            alert("Je kluis is niet ontgrendeld. Log opnieuw in met je wachtwoord."); return;
+        }
+        renderDrumSvg(data.drum_notation).then(function(svg) {
+            data.drum_svg = svg;
+            return LGVault.encryptSongFields(BAND_ID, data);
+        }).then(function(blob) {
+            $.ajax({ url: "api/songs.php", type: "POST", contentType: "application/json",
+                data: JSON.stringify({ id: data.id, band_id: BAND_ID, enc_blob: blob }),
+                dataType: "json", success: afterSave, error: saveFail });
+        }).catch(function() { alert("Versleutelen mislukt."); });
+    } else {
+        $.post("api/songs.php", data, afterSave, "json").fail(saveFail);
+    }
 }
 
 function finishSave() {

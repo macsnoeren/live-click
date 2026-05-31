@@ -129,10 +129,18 @@ function fetchLyrics() {
         dataType: 'json'
     }).done(function(r) {
         if (r.ok && r.lyrics) {
-            // Bijwerken in geheugen + offline-cache
+            // Bijwerken in geheugen
             if (_songById[id]) _songById[id].lyrics = r.lyrics;
             var bandId = typeof BAND_ID !== 'undefined' ? BAND_ID : null;
-            if (_allSongsCache) {
+
+            if (r.stored === false && window.LGVault && _songById[id]) {
+                // Versleutelde band: de server bewaarde de tekst niet. Versleutel
+                // het nummer opnieuw (met de nieuwe tekst) en sla het op.
+                LGVault.encryptSongFields(bandId, _songById[id]).then(function(blob) {
+                    return $.ajax({ url: 'api/songs.php', type: 'POST', contentType: 'application/json',
+                        data: JSON.stringify({ id: id, band_id: bandId, enc_blob: blob }), dataType: 'json' });
+                }).then(function() { loadAllSongs(); }).catch(function() {});
+            } else if (_allSongsCache) {
                 for (var i = 0; i < _allSongsCache.length; i++) {
                     if (_allSongsCache[i].id == id) _allSongsCache[i].lyrics = r.lyrics;
                 }
@@ -152,9 +160,20 @@ function fetchLyrics() {
     });
 }
 
+/* E2EE: ontsleutel (indien nodig) een lijst nummers vóór gebruik.
+   Zonder versleuteling of zonder cryptomodule is dit een no-op. */
+function lgDecryptSongs(bandId, songs) {
+    if (window.LGVault && songs && songs.some(function(s){ return s && s.enc_blob; })) {
+        return LGVault.decryptSongs(bandId, songs);
+    }
+    return Promise.resolve(songs || []);
+}
+
 /* =========================================
    Dashboard: alle nummers (vult de cache)
    Wordt getoond als de virtuele setlist "Alle Nummers".
+   De cache (localStorage) bevat de ruwe serverdata — voor versleutelde
+   bands dus ciphertext; ontsleutelen gebeurt na het laden.
    ========================================= */
 function loadAllSongs() {
     var bandId = typeof BAND_ID !== 'undefined' ? BAND_ID : null;
@@ -163,18 +182,23 @@ function loadAllSongs() {
     // Toon gecachede data meteen (werkt ook zonder netwerk)
     var cached = lgLoad('songs', bandId);
     if (cached) {
-        _allSongsCache = cached;
-        _indexSongs(cached);
-        if (_panelIsAll) showAllSongs();
+        lgDecryptSongs(bandId, cached).then(function(songs) {
+            _allSongsCache = songs;
+            _indexSongs(songs);
+            if (_panelIsAll) showAllSongs();
+        });
     }
 
     // Haal verse data op op de achtergrond
     $.get('api/songs.php?band_id=' + bandId)
         .done(function(data) {
-            _allSongsCache = data.songs || [];
-            lgSave('songs', bandId, _allSongsCache);
-            _indexSongs(_allSongsCache);
-            if (_panelIsAll) showAllSongs();
+            var raw = data.songs || [];
+            lgSave('songs', bandId, raw); // ruwe (eventueel versleutelde) data cachen
+            lgDecryptSongs(bandId, raw).then(function(songs) {
+                _allSongsCache = songs;
+                _indexSongs(songs);
+                if (_panelIsAll) showAllSongs();
+            });
             lgSetOffline(false);
         })
         .fail(function() {
@@ -225,8 +249,8 @@ function loadSetlistDropdown() {
     if (cached) {
         _sortSetlists(cached);
         _renderSetlistOptions(cached);
-        // Index de nummers uit de setlists voor offline gebruik
-        cached.forEach(function(sl) { _indexSongs(sl.songs || []); });
+        // Index de nummers uit de setlists (ontsleuteld) voor offline gebruik
+        _decryptSetlistSongs(bandId, cached);
     }
 
     // Haal verse data op op de achtergrond
@@ -236,12 +260,22 @@ function loadSetlistDropdown() {
             _sortSetlists(lists);
             lgSave('setlists', bandId, lists);
             _renderSetlistOptions(lists);
-            lists.forEach(function(sl) { _indexSongs(sl.songs || []); });
+            _decryptSetlistSongs(bandId, lists);
             lgSetOffline(false);
         })
         .fail(function() {
             lgSetOffline(true);
         });
+}
+
+/* Ontsleutel de nummers binnen elke setlist en index ze (voor selectSongById). */
+function _decryptSetlistSongs(bandId, lists) {
+    (lists || []).forEach(function(sl) {
+        lgDecryptSongs(bandId, sl.songs || []).then(function(songs) {
+            sl.songs = songs;
+            _indexSongs(songs);
+        });
+    });
 }
 
 function _renderSetlistOptions(lists) {
@@ -294,14 +328,22 @@ function loadSetlist(id) {
         var cached = lgLoad('setlists', bandId);
         if (cached) {
             for (var i = 0; i < cached.length; i++) {
-                if (cached[i].id === id) { _applySetlist(cached[i]); return; }
+                if (cached[i].id === id) {
+                    lgDecryptSongs(bandId, cached[i].songs || []).then(function(songs) {
+                        var sl = cached[i]; sl.songs = songs; _applySetlist(sl);
+                    });
+                    return;
+                }
             }
         }
     }
 
     // Fallback naar API (vereist netwerk)
     $.get('api/setlists.php?id=' + id, function(data) {
-        if (data.setlist) _applySetlist(data.setlist);
+        if (!data.setlist) return;
+        lgDecryptSongs(bandId, data.setlist.songs || []).then(function(songs) {
+            data.setlist.songs = songs; _applySetlist(data.setlist);
+        });
     });
 }
 

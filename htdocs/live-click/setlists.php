@@ -101,15 +101,27 @@ var _slSongs = [];
 var _deleteSlId = null;
 var _setlistsData = [];
 var _canEdit = ' . ($canEdit ? 'true' : 'false') . ';
+var BAND_ID = ' . ($bandId ?: 'null') . ';
 
 $(function() {
     loadSetlists();
 });
 
+/* E2EE: ontsleutel een lijst nummers indien versleuteld (anders no-op). */
+function lgDecryptList(songs) {
+    if (window.LGVault && songs && songs.some(function(s){ return s && s.enc_blob; })) {
+        return LGVault.decryptSongs(BAND_ID, songs);
+    }
+    return Promise.resolve(songs || []);
+}
+
 function loadSetlists() {
-    $.get("api/setlists.php", {band_id: ' . $bandId . '}, function(data) {
+    $.get("api/setlists.php", {band_id: BAND_ID}, function(data) {
         _setlistsData = data.setlists || [];
-        renderSetlists(_setlistsData);
+        var jobs = _setlistsData.map(function(sl) {
+            return lgDecryptList(sl.songs || []).then(function(songs) { sl.songs = songs; });
+        });
+        Promise.all(jobs).then(function() { renderSetlists(_setlistsData); });
     });
 }
 
@@ -168,21 +180,26 @@ function openEditSetlist(id) {
     $.get("api/setlists.php", {id: id}, function(data) {
         var sl = data.setlist;
         if (!sl) return;
-        $("#createSetlistTitle").text("Setlist bewerken");
-        $("#sl-name").val(sl.name);
-        $("#sl-id").val(sl.id);
-        _slSongs = sl.songs || [];
-        loadAvailableSongs();
-        renderSlSelected();
-        new bootstrap.Modal("#createSetlistModal").show();
+        lgDecryptList(sl.songs || []).then(function(songs) {
+            sl.songs = songs;
+            $("#createSetlistTitle").text("Setlist bewerken");
+            $("#sl-name").val(sl.name);
+            $("#sl-id").val(sl.id);
+            _slSongs = sl.songs || [];
+            loadAvailableSongs();
+            renderSlSelected();
+            new bootstrap.Modal("#createSetlistModal").show();
+        });
     });
 }
 
 function loadAvailableSongs() {
     if (_allSongs.length) { renderSlAvailable(); return; }
-    $.get("api/songs.php", {band_id: ' . $bandId . '}, function(data) {
-        _allSongs = data.songs || [];
-        renderSlAvailable();
+    $.get("api/songs.php", {band_id: BAND_ID}, function(data) {
+        lgDecryptList(data.songs || []).then(function(songs) {
+            _allSongs = songs;
+            renderSlAvailable();
+        });
     });
 }
 

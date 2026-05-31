@@ -438,10 +438,65 @@
         });
     }
 
+    /* ── Inhoud van nummers ⇄ enc_blob (fase 3) ───────────────────────
+     * De velden die in de versleutelde blob gaan. Alle overige kolommen
+     * (id, band_id, created_by, created_at, pdf_path) blijven leesbaar. */
+    var SONG_BLOB_FIELDS = ['title','artist','bpm','song_key','duration','starts',
+        'description','lyrics','chords','drum_notation','drum_svg','preview_url','spotify_id'];
+
+    /** Bouwt de enc_blob (JSON-string) uit de inhoudsvelden van een nummer. */
+    function encryptSongFields(bandId, song) {
+        return getBandKey(bandId).then(function (bdk) {
+            if (!bdk) throw new Error('Kluis niet ontgrendeld.');
+            var payload = {};
+            SONG_BLOB_FIELDS.forEach(function (f) {
+                if (song[f] !== undefined && song[f] !== null && song[f] !== '') payload[f] = song[f];
+            });
+            return aesEncryptJSON(bdk, payload).then(function (blob) { return JSON.stringify(blob); });
+        });
+    }
+
+    /**
+     * Ontsleutelt (in-place) alle nummers met een enc_blob. Nummers zonder blob
+     * blijven ongemoeid (niet-versleutelde band of nog-niet-gemigreerd). Bij een
+     * vergrendelde kluis worden ze gemarkeerd met _locked en een slot-titel.
+     * Retourneert dezelfde array (Promise).
+     */
+    function decryptSongs(bandId, songs) {
+        songs = songs || [];
+        var encrypted = songs.filter(function (s) { return s && s.enc_blob; });
+        if (!encrypted.length) return Promise.resolve(songs);
+
+        return getBandKey(bandId).then(function (bdk) {
+            if (!bdk) {
+                encrypted.forEach(function (s) {
+                    s._locked = true;
+                    if (!s.title) { s.title = '🔒 Vergrendeld'; s.artist = ''; }
+                });
+                return songs;
+            }
+            return Promise.all(encrypted.map(function (s) {
+                var blob;
+                try { blob = JSON.parse(s.enc_blob); } catch (e) { s._locked = true; return s; }
+                return aesDecryptJSON(bdk, blob).then(function (fields) {
+                    Object.keys(fields).forEach(function (k) { s[k] = fields[k]; });
+                    s._enc = true; s._locked = false;
+                    return s;
+                }).catch(function () {
+                    s._locked = true;
+                    if (!s.title) { s.title = '🔒 Vergrendeld'; s.artist = ''; }
+                    return s;
+                });
+            })).then(function () { return songs; });
+        }).catch(function () { return songs; });
+    }
+
     global.LGVault = {
         status: vaultStatus,
         enableVault: enableVault,
         getBandKey: getBandKey,
-        grantMissing: grantMissing
+        grantMissing: grantMissing,
+        encryptSongFields: encryptSongFields,
+        decryptSongs: decryptSongs
     };
 })(window);

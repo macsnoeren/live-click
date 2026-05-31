@@ -17,7 +17,7 @@ if ($method === 'GET') {
     }
     requireBandAccess($bandId);
     // drum_svg is included so the dashboard can work offline (cached in localStorage)
-    $cols = 'id,title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,drum_svg,lyrics,chords,pdf_path,band_id,created_by,created_at';
+    $cols = 'id,title,artist,bpm,song_key,duration,starts,description,preview_url,spotify_id,drum_notation,drum_svg,lyrics,chords,pdf_path,enc_blob,band_id,created_by,created_at';
     $stmt = $db->prepare("SELECT $cols FROM songs WHERE band_id = ? ORDER BY title COLLATE NOCASE");
     $stmt->execute([$bandId]);
     echo json_encode(['ok' => true, 'songs' => $stmt->fetchAll()]);
@@ -29,7 +29,17 @@ if ($method === 'POST') {
     $id     = (int)($data['id'] ?? 0);
     $title  = trim($data['title'] ?? '');
     $artist = trim($data['artist'] ?? '');
-    if (!$title || !$artist) { echo json_encode(['ok'=>false,'error'=>'Titel en artiest verplicht']); exit; }
+    // Titel/artiest zijn verplicht behalve bij een versleutelde band (dan zitten
+    // ze in enc_blob). De definitieve check gebeurt na de band-/encryptiebepaling.
+    $hasEncBlobInput = isset($data['enc_blob']) && trim($data['enc_blob']) !== '';
+    if (!$hasEncBlobInput && (!$title || !$artist)) {
+        echo json_encode(['ok'=>false,'error'=>'Titel en artiest verplicht']); exit;
+    }
+
+    // E2EE: voor versleutelde bands stuurt de client één versleutelde blob i.p.v.
+    // losse plaintext-velden. We bepalen verderop (na de band-bepaling) of de
+    // band versleuteld is en valideren dienovereenkomstig.
+    $encBlob = isset($data['enc_blob']) && trim($data['enc_blob']) !== '' ? trim($data['enc_blob']) : null;
 
     $bpm        = isset($data['bpm']) && $data['bpm'] !== '' ? (int)$data['bpm'] : null;
     $key        = trim($data['song_key']    ?? '') ?: null;
@@ -44,9 +54,10 @@ if ($method === 'POST') {
 
     // Bescherming tegen DoS via gigantische velden (M4)
     if (strlen($desc ?? '') > 4000 || strlen($drumNotation ?? '') > 5000
-        || strlen($lyrics ?? '') > 20000 || strlen($chords ?? '') > 20000) {
+        || strlen($lyrics ?? '') > 20000 || strlen($chords ?? '') > 20000
+        || strlen($encBlob ?? '') > 400000) {
         http_response_code(413);
-        echo json_encode(['ok' => false, 'error' => 'Een van de tekstvelden is te lang.']);
+        echo json_encode(['ok' => false, 'error' => 'Een van de velden is te lang.']);
         exit;
     }
 
@@ -85,8 +96,28 @@ if ($method === 'POST') {
         exit;
     }
 
+    // Is de doelband versleuteld? (update: huidige band; insert: doelband)
+    $effectiveBandId = $id ? (int)($currentBandId ?? 0) : (int)($bandId ?? 0);
+    $encrypted = bandIsEncrypted($effectiveBandId);
+
+    if ($encrypted && $encBlob === null) {
+        echo json_encode(['ok'=>false,'error'=>'Deze band is versleuteld; er is geen versleutelde inhoud meegegeven.']);
+        exit;
+    }
+
     try {
-        if ($id) {
+        if ($encrypted) {
+            // Versleutelde band: alleen de blob bewaren. Plaintext-kolommen leeg
+            // (title/artist zijn NOT NULL → lege string als placeholder).
+            if ($id) {
+                $db->prepare("UPDATE songs SET title='',artist='',bpm=NULL,song_key=NULL,duration=NULL,starts=NULL,description=NULL,preview_url=NULL,spotify_id=NULL,drum_notation=NULL,drum_svg=NULL,drum_svg_updated_at=NULL,lyrics=NULL,chords=NULL,enc_blob=? WHERE id=?")
+                   ->execute([$encBlob, $id]);
+            } else {
+                $db->prepare("INSERT INTO songs (title,artist,band_id,created_by,enc_blob) VALUES ('','',?,?,?)")
+                   ->execute([$bandId, currentUser()['id'], $encBlob]);
+                $id = $db->lastInsertId();
+            }
+        } elseif ($id) {
             $db->prepare('UPDATE songs SET title=?,artist=?,bpm=?,song_key=?,duration=?,starts=?,description=?,preview_url=?,spotify_id=?,drum_notation=?,drum_svg=?,drum_svg_updated_at=?,lyrics=?,chords=? WHERE id=?')
                ->execute([$title, $artist, $bpm, $key, $dur, $starts, $desc, $previewUrl, $spotifyId, $drumNotation, $drumSvg, $drumSvgUpdatedAt, $lyrics, $chords, $id]);
         } else {

@@ -560,6 +560,14 @@ function requireBandLeader(int $bandId): void {
     }
 }
 
+/** Staat de E2EE-kluis aan voor deze band? (zie PRIVACY.md) */
+function bandIsEncrypted(int $bandId): bool {
+    if (!$bandId) return false;
+    $s = getDB()->prepare('SELECT is_encrypted FROM bands WHERE id = ?');
+    $s->execute([$bandId]);
+    return (int)$s->fetchColumn() === 1;
+}
+
 /** band_id van een song; null als song niet bestaat. */
 function getSongBandId(int $songId): ?int {
     $s = getDB()->prepare('SELECT band_id FROM songs WHERE id=?');

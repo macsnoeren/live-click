@@ -136,6 +136,9 @@ function initSchema(PDO $db): void {
     try { $db->exec('ALTER TABLE songs ADD COLUMN lyrics TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE songs ADD COLUMN chords TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE songs ADD COLUMN pdf_path TEXT'); } catch (PDOException $e) {}
+    // E2EE (fase 3): versleutelde blob met alle inhoudsvelden van een nummer.
+    // Voor versleutelde bands staan de losse plaintext-kolommen leeg/NULL.
+    try { $db->exec('ALTER TABLE songs ADD COLUMN enc_blob TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE bands ADD COLUMN share_token TEXT'); } catch (PDOException $e) {}
     try { $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_bands_share_token ON bands(share_token) WHERE share_token IS NOT NULL'); } catch (PDOException $e) {}
     // E2EE-sleutelmateriaal per gebruiker (zie PRIVACY.md). Allemaal nullable:

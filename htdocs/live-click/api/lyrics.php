@@ -59,6 +59,13 @@ if ($lyrics === null) {
 $lyrics = str_replace(["\r\n", "\r"], "\n", $lyrics);
 if (strlen($lyrics) > 20000) $lyrics = substr($lyrics, 0, 20000);
 
+// Bij een versleutelde band mag de server de tekst NIET opslaan (zero-knowledge):
+// we geven hem alleen terug; de client versleutelt hem in de song-blob (songs.php).
+if (bandIsEncrypted($song['band_id'] !== null ? (int)$song['band_id'] : 0)) {
+    echo json_encode(['ok' => true, 'lyrics' => $lyrics, 'stored' => false]);
+    exit;
+}
+
 try {
     $db->prepare('UPDATE songs SET lyrics = ? WHERE id = ?')->execute([$lyrics, $id]);
 } catch (PDOException $e) {
@@ -68,7 +75,7 @@ try {
     exit;
 }
 
-echo json_encode(['ok' => true, 'lyrics' => $lyrics]);
+echo json_encode(['ok' => true, 'lyrics' => $lyrics, 'stored' => true]);
 
 /* =========================================
    Bron: lyrics.ovh
