@@ -3,6 +3,7 @@ require_once __DIR__ . '/bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
 $user = currentUser();
+$canEdit = userCanEditBandContent((int)($user['band_id'] ?? 0));
 $pageTitle = 'Nummers — LiveGig';
 require APP_ROOT . '/includes/header.php';
 ?>
@@ -16,9 +17,11 @@ require APP_ROOT . '/includes/header.php';
         </h4>
         <div class="d-flex gap-2">
             <input type="search" id="song-filter" class="form-control form-control-sm" placeholder="Zoeken..." style="width:200px">
+            <?php if ($canEdit): ?>
             <button class="btn btn-danger btn-sm" onclick="openAddSong()">
                 <i class="bi bi-plus-lg"></i> Nummer toevoegen
             </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -243,6 +246,7 @@ define('SPOTIFY_CLIENT_SECRET', 'jouw_secret');</pre>
 $extraScripts = '<script>
 var _deleteSongId = null;
 var _songsList = [];
+var _canEdit = ' . ($canEdit ? 'true' : 'false') . ';
 $(function() { loadSongsTable(); });
 
 function loadSongsTable() {
@@ -272,8 +276,10 @@ function renderSongsTable(songs) {
             \'<td class="text-muted">\' + escHtml(s.duration || "") + \'</td>\' +
             \'<td>\' + escHtml(s.starts || "") + \'</td>\' +
             \'<td class="text-muted small">\' + escHtml(s.description || "").substring(0,60) + \'</td>\' +
-            \'<td><button class="btn btn-xs btn-outline-secondary me-1" onclick="openEditSong(\' + i + \')"><i class="bi bi-pencil"></i></button>\' +
-            \'<button class="btn btn-xs btn-outline-danger" onclick="openDeleteSong(\' + s.id + \',\' + i + \')"><i class="bi bi-trash"></i></button></td>\' +
+            (_canEdit
+                ? \'<td><button class="btn btn-xs btn-outline-secondary me-1" onclick="openEditSong(\' + i + \')"><i class="bi bi-pencil"></i></button>\' +
+                  \'<button class="btn btn-xs btn-outline-danger" onclick="openDeleteSong(\' + s.id + \',\' + i + \')"><i class="bi bi-trash"></i></button></td>\'
+                : \'<td></td>\') +
             \'</tr>\'
         );
     });

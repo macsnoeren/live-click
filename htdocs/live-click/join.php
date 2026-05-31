@@ -37,8 +37,10 @@ if ($invite) {
         if ($alreadyMember) {
             header('Location: bands.php'); exit;
         }
-        $db->prepare('INSERT OR IGNORE INTO band_members (user_id, band_id) VALUES (?,?)')
-           ->execute([$user['id'], $invite['band_id']]);
+        // Nieuwe deelnemers komen binnen als 'viewer' (alleen bekijken).
+        // De bandleider kan hen daarna promoveren naar 'member' of 'leader'.
+        $db->prepare('INSERT OR IGNORE INTO band_members (user_id, band_id, role) VALUES (?,?,?)')
+           ->execute([$user['id'], $invite['band_id'], 'viewer']);
         $success = true;
     }
 }
@@ -77,7 +79,8 @@ $csrf = csrfToken();
         <?php elseif ($success): ?>
             <div class="alert alert-success">
                 <i class="bi bi-check-circle-fill me-2"></i>
-                Je bent nu lid van <strong><?= htmlspecialchars($invite['band_name']) ?></strong>!
+                Je hebt nu toegang tot <strong><?= htmlspecialchars($invite['band_name']) ?></strong> als
+                <strong>kijker</strong>. De bandleider kan je rol uitbreiden naar lid of leider.
             </div>
             <a href="bands.php" class="btn btn-danger w-100">
                 <i class="bi bi-people-fill me-2"></i> Naar mijn bands

@@ -3,6 +3,7 @@ require_once __DIR__ . '/bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
 $user = currentUser();
+$canEdit = userCanEditBandContent((int)($user['band_id'] ?? 0));
 $pageTitle = 'Setlists — LiveGig';
 require APP_ROOT . '/includes/header.php';
 ?>
@@ -14,7 +15,7 @@ require APP_ROOT . '/includes/header.php';
             <span class="badge bg-secondary ms-2"><?= htmlspecialchars($user['band_name']) ?></span>
             <?php endif; ?>
         </h4>
-        <?php if ($user['band_id']): ?>
+        <?php if ($user['band_id'] && $canEdit): ?>
         <button class="btn btn-danger btn-sm" onclick="openCreateSetlist()">
             <i class="bi bi-plus-lg"></i> Nieuwe setlist
         </button>
@@ -99,6 +100,7 @@ var _allSongs = [];
 var _slSongs = [];
 var _deleteSlId = null;
 var _setlistsData = [];
+var _canEdit = ' . ($canEdit ? 'true' : 'false') . ';
 
 $(function() {
     loadSetlists();
@@ -128,10 +130,13 @@ function renderSetlists(lists) {
             \'<span class="fw-bold">\' + escHtml(sl.name) + \'</span>\' +
             durBadge +
             \'</div>\' +
-            \'<div class="d-flex gap-1">\' +
-            \'<button class="btn btn-xs btn-outline-secondary" onclick="openEditSetlist(\' + sl.id + \')"><i class="bi bi-pencil"></i></button>\' +
-            \'<button class="btn btn-xs btn-outline-danger" onclick="openDeleteSetlist(\' + sl.id + \',\' + slIdx + \')"><i class="bi bi-trash"></i></button>\' +
-            \'</div></div>\' +
+            (_canEdit
+                ? \'<div class="d-flex gap-1">\' +
+                  \'<button class="btn btn-xs btn-outline-secondary" onclick="openEditSetlist(\' + sl.id + \')"><i class="bi bi-pencil"></i></button>\' +
+                  \'<button class="btn btn-xs btn-outline-danger" onclick="openDeleteSetlist(\' + sl.id + \',\' + slIdx + \')"><i class="bi bi-trash"></i></button>\' +
+                  \'</div>\'
+                : \'\') +
+            \'</div>\' +
             \'<div class="list-group list-group-flush">\';
         songs.forEach(function(s, songIdx) {
             html += \'<button class="list-group-item list-group-item-action list-group-item-dark d-flex justify-content-between align-items-center py-2" onclick="selectSongFromSetlist(\' + slIdx + \',\' + songIdx + \')">\'

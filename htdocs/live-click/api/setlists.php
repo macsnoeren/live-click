@@ -60,7 +60,7 @@ if ($method === 'POST') {
     $songs  = $data['songs'] ?? [];
 
     if (!$name || !$bandId) { echo json_encode(['ok'=>false,'error'=>'Naam en band verplicht']); exit; }
-    requireBandAccess($bandId);
+    requireBandContentAccess($bandId);
 
     if ($id) {
         // Bij update: controleer huidige eigenaarband (mag niet via "id" naar andere band gesleept worden zonder toegang).
@@ -70,9 +70,9 @@ if ($method === 'POST') {
             echo json_encode(['ok' => false, 'error' => 'Setlist niet gevonden.']);
             exit;
         }
-        if (!userCanAccessBand($currentBandId)) {
+        if (!userCanEditBandContent((int)$currentBandId)) {
             http_response_code(403);
-            echo json_encode(['ok' => false, 'error' => 'Geen toegang tot deze setlist.']);
+            echo json_encode(['ok' => false, 'error' => 'Je hebt alleen leesrechten voor deze setlist.']);
             exit;
         }
         $db->prepare('UPDATE setlists SET name=? WHERE id=?')->execute([$name,$id]);
@@ -112,9 +112,9 @@ if ($method === 'DELETE') {
         echo json_encode(['ok' => false, 'error' => 'Setlist niet gevonden.']);
         exit;
     }
-    if (!userCanAccessBand($bandId)) {
+    if (!userCanEditBandContent((int)$bandId)) {
         http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Geen toegang tot deze setlist.']);
+        echo json_encode(['ok' => false, 'error' => 'Je hebt alleen leesrechten voor deze setlist.']);
         exit;
     }
     $db->prepare('DELETE FROM setlists WHERE id=?')->execute([$id]);

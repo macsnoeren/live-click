@@ -735,6 +735,14 @@ body.page-dashboard #page-content {
 }
 
 /* PDF-tab: iframe vult het paneel rand-tot-rand */
+/* Compacte rol-dropdown in de ledenlijst (bands.php) */
+.lg-role-select {
+    width: auto;
+    font-size: 0.7rem;
+    padding: 1px 20px 1px 6px;
+    height: auto;
+}
+
 .db-pane-pdf { padding: 0; overflow: hidden; }
 .db-pdf-frame {
     flex: 1;

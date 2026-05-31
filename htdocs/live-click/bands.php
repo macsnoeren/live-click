@@ -134,6 +134,23 @@ function isLeaderOf(b) {
     return (b.members || []).some(function(m) { return m.id == _myUserId && m.role === "leader"; });
 }
 
+function roleLabel(role) {
+    if (role === "leader") return "Leider";
+    if (role === "viewer") return "Kijker";
+    return "Lid";
+}
+
+// Rol van een lid wijzigen (alleen leider/admin; backend bewaakt de laatste leider).
+function setMemberRole(el) {
+    var bandId = parseInt(el.dataset.bandId, 10);
+    var userId = parseInt(el.dataset.userId, 10);
+    var role   = el.value;
+    $.post("api/bands.php", JSON.stringify({action: "set_role", band_id: bandId, user_id: userId, role: role}), function(r) {
+        if (!r.ok) alert(r.error || "Rol wijzigen mislukt");
+        loadBands(); // altijd herladen — herstelt de dropdown bij een geweigerde wijziging
+    }, "json").fail(function() { alert("Rol wijzigen mislukt"); loadBands(); });
+}
+
 function renderBands(bands) {
     var c = $("#bands-container"); c.empty();
     if (!bands.length) {
@@ -167,14 +184,29 @@ function renderBands(bands) {
             var isMe       = (m.id == _myUserId);
             var isLeader   = (m.role === "leader");
             var leaderIcon = isLeader ? \'<i class="bi bi-star-fill text-warning me-1" title="Bandleider" style="font-size:0.65rem"></i>\' : \'\';
+
+            // Rol-besturing: leider/admin kan rollen van anderen wijzigen (niet de eigen rol).
+            var roleControl;
+            if (canManage && !isMe) {
+                roleControl = \'<select class="form-select form-select-sm ms-auto lg-role-select"\'
+                    + \' data-band-id="\' + b.id + \'" data-user-id="\' + m.id + \'" onchange="setMemberRole(this)">\'
+                    + \'<option value="leader"\' + (m.role === "leader" ? " selected" : "") + \'>Leider</option>\'
+                    + \'<option value="member"\' + (m.role === "member" ? " selected" : "") + \'>Lid</option>\'
+                    + \'<option value="viewer"\' + (m.role === "viewer" ? " selected" : "") + \'>Kijker</option>\'
+                    + \'</select>\';
+            } else {
+                roleControl = \'<span class="badge bg-secondary ms-auto" style="font-size:0.6rem">\' + roleLabel(m.role) + \'</span>\';
+            }
+
             var removeBtn  = (!isMe && canManage)
-                ? \'<button class="btn btn-xs btn-link text-danger p-0 ms-auto"\'
+                ? \'<button class="btn btn-xs btn-link text-danger p-0 ms-1"\'
                   + \' data-band-id="\' + b.id + \'" data-user-id="\' + m.id + \'" data-username="\' + escHtml(m.username) + \'"\'
                   + \' onclick="removeMember(this)" title="Toegang ontzeggen"><i class="bi bi-x-lg"></i></button>\'
                 : \'\';
             membersHtml += \'<div class="d-flex align-items-center py-1 border-bottom border-secondary" style="border-bottom-style:dashed!important">\'
                 + leaderIcon
                 + \'<span class="small \' + (isMe ? "text-white" : "text-muted") + \'">\' + escHtml(m.username) + (isMe ? \' <span class="text-muted">(jij)</span>\' : \'\') + \'</span>\'
+                + roleControl
                 + removeBtn
                 + \'</div>\';
         });
