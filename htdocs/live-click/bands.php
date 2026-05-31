@@ -180,16 +180,41 @@ function loadBands() {
     });
 }
 
-// E2EE: deel als leider stil de BDK uit aan leden die nog geen sleutel hebben
-// (bv. iemand die zich na de uitnodiging pas later heeft aangemeld).
+// E2EE: deel als leider stil de BDK uit aan leden die nog geen sleutel hebben,
+// en ververs daarna de kluisstatus-badges per lid.
 function grantKeysToNewMembers() {
     if (!window.LGVault || !window.LGKeys || LGKeys.keyState() !== "unlocked") return;
     _allBands.forEach(function(b) {
         if (b.is_encrypted != 1) return;
         var amLeader = (b.members || []).some(function(m){ return m.id == _myUserId && m.role === "leader"; });
         if (!amLeader && !_isAdmin) return;
-        LGVault.grantMissing(b.id).catch(function(){});
+        // Eerst proberen ontbrekende sleutels uit te delen, dan de status tonen.
+        LGVault.grantMissing(b.id).catch(function(){}).then(function() {
+            refreshVaultStatus(b.id);
+        });
     });
+}
+
+// Toont per lid of die toegang tot de kluis heeft:
+//   🔑 groen  = heeft sleutel
+//   ⏳ geel   = wacht op sleutel (nog nooit ingelogd sinds versleuteling)
+function refreshVaultStatus(bandId) {
+    if (!window.LGVault) return;
+    LGVault.status(bandId).then(function(st) {
+        if (!st.ok || !st.is_encrypted || !st.can_manage || !st.members) return;
+        st.members.forEach(function(m) {
+            var el = document.querySelector(
+                \'.vault-key-status[data-band-id="\' + bandId + \'"][data-user-id="\' + m.user_id + \'"]\');
+            if (!el) return;
+            if (m.has_key) {
+                el.innerHTML = \' <i class="bi bi-key-fill text-success" title="Heeft toegang tot de kluis"></i>\';
+            } else if (!m.pubkey) {
+                el.innerHTML = \' <i class="bi bi-hourglass-split text-warning" title="Wacht op sleutel — dit lid moet eerst één keer inloggen"></i>\';
+            } else {
+                el.innerHTML = \' <i class="bi bi-hourglass-split text-warning" title="Sleutel wordt toegekend zodra een leider de bandpagina opent"></i>\';
+            }
+        });
+    }).catch(function(){});
 }
 
 function loadAllUsers() {
@@ -331,9 +356,16 @@ function renderBands(bands) {
                   + \' data-band-id="\' + b.id + \'" data-user-id="\' + m.id + \'" data-username="\' + escHtml(m.username) + \'"\'
                   + \' onclick="removeMember(this)" title="Toegang ontzeggen"><i class="bi bi-x-lg"></i></button>\'
                 : \'\';
+            // Kluisstatus per lid (alleen bij versleutelde band): placeholder die
+            // grantKeysToNewMembers()/refreshVaultStatus() later invult.
+            var keyStatus = isEncrypted
+                ? \' <span class="vault-key-status" data-band-id="\' + b.id + \'" data-user-id="\' + m.id + \'"></span>\'
+                : \'\';
+
             membersHtml += \'<div class="d-flex align-items-center py-1 border-bottom border-secondary" style="border-bottom-style:dashed!important">\'
                 + leaderIcon
                 + \'<span class="small \' + (isMe ? "text-white" : "text-muted") + \'">\' + escHtml(m.username) + (isMe ? \' <span class="text-muted">(jij)</span>\' : \'\') + \'</span>\'
+                + keyStatus
                 + roleControl
                 + removeBtn
                 + \'</div>\';
