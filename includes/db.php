@@ -125,6 +125,67 @@ function initSchema(PDO $db): void {
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_backup_user ON totp_backup_codes(user_id);
+
+        -- ── Facturatie / abonnementen (Mollie) ──────────────────────────────
+        -- Kortingscodes worden in de app zelf beheerd: Mollie kent géén
+        -- ingebouwd couponsysteem, dus de kortinglogica leeft hier.
+        --   type     'percent' (value = 0-100) of 'fixed' (value = bedrag in EUR)
+        --   duration 'once' (alleen eerste incasso) of 'forever' (hele looptijd)
+        CREATE TABLE IF NOT EXISTS discount_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL UNIQUE,
+            type TEXT NOT NULL DEFAULT 'percent',
+            value REAL NOT NULL DEFAULT 0,
+            description TEXT,
+            duration TEXT NOT NULL DEFAULT 'once',
+            max_redemptions INTEGER,
+            times_redeemed INTEGER NOT NULL DEFAULT 0,
+            valid_until DATETIME,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Eén abonnement per gebruiker. De Mollie-id's blijven NULL tot de
+        -- betaalflow (first payment + subscription) is doorlopen.
+        --   status  pending|trialing|active|canceled|suspended
+        CREATE TABLE IF NOT EXISTS subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            mollie_customer_id TEXT,
+            mollie_subscription_id TEXT,
+            mollie_mandate_id TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            amount REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT 'EUR',
+            interval TEXT NOT NULL DEFAULT '1 month',
+            discount_code_id INTEGER,
+            trial_ends_at DATETIME,
+            next_payment_at DATETIME,
+            started_at DATETIME,
+            canceled_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (discount_code_id) REFERENCES discount_codes(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+
+        -- Losse afschrijvingen. Wordt gevuld door de Mollie-webhook.
+        --   status  open|pending|paid|failed|canceled|expired|refunded
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            subscription_id INTEGER,
+            mollie_payment_id TEXT UNIQUE,
+            amount REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT 'EUR',
+            status TEXT NOT NULL DEFAULT 'open',
+            description TEXT,
+            paid_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+            FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at);
     ");
 
     // Add columns introduced after initial schema (safe to run on existing DBs)
