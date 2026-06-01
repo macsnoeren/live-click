@@ -66,5 +66,37 @@ if ($method === 'POST') {
     exit;
 }
 
+if ($method === 'DELETE') {
+    $data = json_decode(file_get_contents('php://input'), true) ?: [];
+    $id   = (int)($data['id'] ?? 0);
+    if (!$id) { echo json_encode(['ok'=>false,'error'=>'Geen id']); exit; }
+
+    // Je kunt jezelf niet verwijderen (voorkomt dat je jezelf buitensluit).
+    if ($id === (int)currentUser()['id']) {
+        echo json_encode(['ok'=>false,'error'=>'Je kunt je eigen account niet verwijderen.']); exit;
+    }
+
+    $row = $db->prepare('SELECT username, role FROM users WHERE id=?');
+    $row->execute([$id]);
+    $target = $row->fetch();
+    if (!$target) { http_response_code(404); echo json_encode(['ok'=>false,'error'=>'Gebruiker niet gevonden.']); exit; }
+
+    // Bescherm de laatste admin: er moet er altijd minstens één overblijven.
+    if ($target['role'] === 'admin') {
+        $cnt = (int)$db->query("SELECT COUNT(*) FROM users WHERE role='admin'")->fetchColumn();
+        if ($cnt <= 1) {
+            echo json_encode(['ok'=>false,'error'=>'Dit is de laatste admin; die kan niet verwijderd worden.']); exit;
+        }
+    }
+
+    // band_members verdwijnt via ON DELETE CASCADE; bands waar deze gebruiker de
+    // enige leider was, blijven bestaan (een andere leider/lid kan ze beheren of
+    // de admin kan ze verwijderen). Songs/setlists blijven aan de band gekoppeld.
+    $db->prepare('DELETE FROM users WHERE id=?')->execute([$id]);
+    auditLog('user.delete', 'user', $id, ['username' => $target['username']]);
+    echo json_encode(['ok'=>true]);
+    exit;
+}
+
 http_response_code(405);
 echo json_encode(['ok'=>false,'error'=>'Method not allowed']);

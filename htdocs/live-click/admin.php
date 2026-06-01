@@ -25,10 +25,12 @@ require APP_ROOT . '/includes/header.php';
                 </button>
             </div>
             <div class="card">
+                <div class="table-responsive">
                 <table class="table table-dark table-hover table-sm mb-0">
                     <thead><tr><th>Gebruikersnaam</th><th>E-mail</th><th>Rol</th><th>Bands</th><th>Aangemaakt</th><th></th></tr></thead>
                     <tbody id="users-tbody"><tr><td colspan="6" class="text-muted">Laden...</td></tr></tbody>
                 </table>
+                </div>
             </div>
         </div>
 
@@ -41,8 +43,13 @@ require APP_ROOT . '/includes/header.php';
                 Als beheerder kun je bands alleen <strong>verwijderen</strong> (opschonen).
                 Aanmaken, hernoemen, leden en versleuteling beheren de bandleiders zelf.
             </p>
-            <div id="bands-container" class="row g-3">
-                <div class="col-12 text-muted">Laden...</div>
+            <div class="card">
+                <div class="table-responsive">
+                <table class="table table-dark table-hover table-sm mb-0">
+                    <thead><tr><th>Bandnaam</th><th>Beschrijving</th><th>Leden</th><th class="text-center">Versleuteld</th><th></th></tr></thead>
+                    <tbody id="bands-tbody"><tr><td colspan="5" class="text-muted">Laden...</td></tr></tbody>
+                </table>
+                </div>
             </div>
         </div>
     </div>
@@ -95,6 +102,28 @@ require APP_ROOT . '/includes/header.php';
     </div>
 </div>
 
+<!-- Gebruiker verwijderen: bevestiging -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Gebruiker verwijderen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Weet je zeker dat je <strong id="del-user-name"></strong> wilt verwijderen?
+                <div class="small text-warning mt-2">
+                    <i class="bi bi-exclamation-triangle"></i> Het account en alle bandlidmaatschappen worden verwijderd.
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
+                <button class="btn btn-danger" onclick="confirmDeleteUser()">Verwijderen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Band verwijderen: bevestiging -->
 <div class="modal fade" id="deleteBandModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
@@ -121,6 +150,7 @@ require APP_ROOT . '/includes/header.php';
 $extraScripts = '<script>
 var _allUsers = [];
 var _allBands = [];
+var _myUserId = ' . (int)$user['id'] . ';
 
 $(function() {
     loadUsers();
@@ -145,8 +175,33 @@ function renderUsers(users) {
             + \'<td><span class="badge \' + (u.role==="admin"?"bg-warning text-dark":"bg-secondary") + \'">\' + u.role + \'</span></td>\'
             + \'<td class="text-muted">\' + (bands || "—") + \'</td>\'
             + \'<td class="text-muted small">\' + escHtml(u.created_at||"") + \'</td>\'
-            + \'<td><button class="btn btn-xs btn-outline-secondary" onclick="openEditUser(\' + u.id + \')"><i class="bi bi-pencil"></i></button></td>\'
+            + \'<td class="text-nowrap">\'
+            + \'<button class="btn btn-xs btn-outline-secondary me-1" onclick="openEditUser(\' + u.id + \')" title="Bewerken"><i class="bi bi-pencil"></i></button>\'
+            + (u.id === _myUserId
+                ? \'\'
+                : \'<button class="btn btn-xs btn-outline-danger" onclick="askDeleteUser(\' + u.id + \')" title="Verwijderen"><i class="bi bi-trash"></i></button>\')
+            + \'</td>\'
             + \'</tr>\');
+    });
+}
+
+var _delUserId = null;
+function askDeleteUser(id) {
+    var u = _allUsers.find(function(x){ return x.id === id; });
+    _delUserId = id;
+    $("#del-user-name").text(u ? u.username : "deze gebruiker");
+    new bootstrap.Modal("#deleteUserModal").show();
+}
+function confirmDeleteUser() {
+    if (!_delUserId) return;
+    $.ajax({ url: "api/users.php", type: "DELETE", contentType: "application/json",
+        data: JSON.stringify({ id: _delUserId }), dataType: "json",
+        success: function(r) {
+            bootstrap.Modal.getInstance("#deleteUserModal").hide();
+            if (r.ok) { loadUsers(); loadBands(); }
+            else alert(r.error || "Verwijderen mislukt");
+        },
+        error: function(xhr) { alert("Verwijderen mislukt (HTTP " + xhr.status + ")"); }
     });
 }
 
@@ -159,20 +214,20 @@ function loadBands() {
 }
 
 function renderBands(bands) {
-    var c = $("#bands-container"); c.empty();
-    if (!bands.length) { c.html(\'<div class="col-12 text-muted">Nog geen bands</div>\'); return; }
+    var tb = $("#bands-tbody"); tb.empty();
+    if (!bands.length) { tb.append(\'<tr><td colspan="5" class="text-muted">Nog geen bands</td></tr>\'); return; }
     bands.forEach(function(b) {
         var members = (b.members || []).map(function(m){ return escHtml(m.username); }).join(", ");
         var enc = (b.is_encrypted == 1)
-            ? \' <i class="bi bi-shield-lock-fill text-success" title="Versleuteld"></i>\' : "";
-        c.append(\'<div class="col-md-6 col-lg-4">\'
-            + \'<div class="card"><div class="card-body">\'
-            + \'<div class="d-flex justify-content-between align-items-start">\'
-            + \'<div><h6 class="fw-bold mb-1">\' + escHtml(b.name) + enc + \'</h6>\'
-            + \'<p class="text-muted small mb-1">\' + escHtml(b.description || "") + \'</p>\'
-            + \'<p class="small mb-0">Leden: \' + (members || "—") + \'</p></div>\'
-            + \'<button class="btn btn-xs btn-outline-danger" onclick="askDeleteBand(\' + b.id + \')" title="Band verwijderen"><i class="bi bi-trash"></i></button>\'
-            + \'</div></div></div></div>\');
+            ? \'<i class="bi bi-shield-lock-fill text-success" title="End-to-end versleuteld"></i>\'
+            : \'<span class="text-muted">—</span>\';
+        tb.append(\'<tr>\'
+            + \'<td class="fw-semibold">\' + escHtml(b.name) + \'</td>\'
+            + \'<td class="text-muted small">\' + escHtml(b.description || "") + \'</td>\'
+            + \'<td class="text-muted small">\' + (members || "—") + \'</td>\'
+            + \'<td class="text-center">\' + enc + \'</td>\'
+            + \'<td><button class="btn btn-xs btn-outline-danger" onclick="askDeleteBand(\' + b.id + \')" title="Band verwijderen"><i class="bi bi-trash"></i></button></td>\'
+            + \'</tr>\');
     });
 }
 
