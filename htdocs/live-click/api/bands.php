@@ -12,10 +12,13 @@ $isAdmin = $user['role'] === 'admin';
 
 /* ---- helpers ---- */
 
-function getBandsForUser(PDO $db, int $userId, bool $isAdmin): array {
-    if ($isAdmin) {
+function getBandsForUser(PDO $db, int $userId, bool $allBands = false): array {
+    if ($allBands) {
+        // Alleen voor het admin-paneel (verwijderen): álle bands.
         $bands = $db->query('SELECT * FROM bands ORDER BY name')->fetchAll();
     } else {
+        // Standaard: alleen bands waar de gebruiker zelf lid van is — ook voor
+        // de admin. De admin ziet niet automatisch andermans bands.
         $stmt = $db->prepare(
             'SELECT b.* FROM bands b JOIN band_members bm ON bm.band_id = b.id
              WHERE bm.user_id = ? ORDER BY b.name'
@@ -59,7 +62,14 @@ function isBandMember(PDO $db, int $bandId, int $userId): bool {
 /* ---- GET ---- */
 
 if ($method === 'GET') {
-    echo json_encode(['ok' => true, 'bands' => getBandsForUser($db, $user['id'], $isAdmin)]);
+    // ?all=1 → álle bands, uitsluitend voor admins (admin-paneel, verwijderen).
+    // Anders: alleen de eigen bands van de gebruiker.
+    $wantAll = !empty($_GET['all']);
+    if ($wantAll && !$isAdmin) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Geen toegang']); exit;
+    }
+    echo json_encode(['ok' => true, 'bands' => getBandsForUser($db, $user['id'], $wantAll)]);
     exit;
 }
 

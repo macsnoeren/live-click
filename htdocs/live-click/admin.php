@@ -151,7 +151,8 @@ function renderUsers(users) {
 }
 
 function loadBands() {
-    $.get("api/bands.php", function(data) {
+    // Admin-paneel: álle bands (alleen om te kunnen verwijderen).
+    $.get("api/bands.php", { all: 1 }, function(data) {
         _allBands = data.bands || [];
         renderBands(_allBands);
     });
