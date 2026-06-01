@@ -18,7 +18,8 @@ require APP_ROOT . '/includes/header.php';
         </h4>
         <div class="d-flex gap-2">
             <input type="search" id="song-filter" class="form-control form-control-sm" placeholder="Zoeken..." style="width:200px"
-                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="song-filter-nofill">
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="song-filter-nofill"
+                   data-1p-ignore data-lpignore="true" data-form-type="other" data-bwignore>
             <?php if ($canEdit): ?>
             <button class="btn btn-outline-secondary btn-sm" onclick="openImport()" title="Nummers importeren uit een andere band">
                 <i class="bi bi-box-arrow-in-down"></i> Importeren

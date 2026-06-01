@@ -44,7 +44,8 @@ require APP_ROOT . '/includes/header.php';
                 <input type="search" id="dash-search" class="form-control form-control-sm mt-2"
                        placeholder="Zoek nummer..." autocomplete="off"
                        autocorrect="off" autocapitalize="off" spellcheck="false"
-                       name="dash-search-nofill">
+                       name="dash-search-nofill"
+                       data-1p-ignore data-lpignore="true" data-form-type="other" data-bwignore>
             </div>
             <div id="setlist-songs" class="list-group list-group-flush db-list">
                 <div class="list-group-item text-muted">Laden...</div>
