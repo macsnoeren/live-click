@@ -277,12 +277,32 @@ function confirmEnableVault() {
                 if (st.ok && !st.has_recovery) {
                     return LGKeys.setupRecovery().then(function(code) { showRecoveryCode(code); });
                 }
+                // Al een herstelcode → bevestigen dat die ook voor deze band geldt.
+                showVaultDone();
                 loadBands();
             });
     }).catch(function(e) {
         $("#vault-enable-alert").text(e.message || "Versleutelen mislukt.").show();
         $("#vault-enable-confirm").prop("disabled", false);
     });
+}
+
+// Korte bevestiging na het versleutelen van een band wanneer er al een
+// herstelcode bestaat (die geldt voor al je bands — er is er maar één nodig).
+function showVaultDone() {
+    $("#vault-done-modal").remove();
+    $("body").append(
+        \'<div class="modal fade" id="vault-done-modal" tabindex="-1"><div class="modal-dialog"><div class="modal-content bg-dark">\'
+        + \'<div class="modal-header border-secondary"><h5 class="modal-title"><i class="bi bi-shield-check text-success"></i> Band versleuteld</h5>\'
+        + \'<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>\'
+        + \'<div class="modal-body"><p>Deze band is nu end-to-end versleuteld.</p>\'
+        + \'<div class="alert alert-info py-2 small mb-0"><i class="bi bi-key me-1"></i>\'
+        + \'Je bestaande <strong>herstelcode</strong> blijft geldig: \\u00e9\\u00e9n herstelcode dekt al je versleutelde bands. \'
+        + \'Je hoeft dus geen nieuwe te bewaren.</div></div>\'
+        + \'<div class="modal-footer border-secondary"><button type="button" class="btn btn-primary" data-bs-dismiss="modal">Begrepen</button></div>\'
+        + \'</div></div></div>\'
+    );
+    new bootstrap.Modal("#vault-done-modal").show();
 }
 
 function showRecoveryCode(code) {
@@ -479,6 +499,8 @@ function enableVaultForNewBand(bandId) {
                 if (st.ok && !st.has_recovery) {
                     return LGKeys.setupRecovery().then(function(code) { showRecoveryCode(code); });
                 }
+                // Al een herstelcode → bevestigen dat die ook voor deze band geldt.
+                showVaultDone();
                 loadBands();
             });
     }).catch(function(e) {

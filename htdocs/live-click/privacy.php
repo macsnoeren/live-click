@@ -12,6 +12,24 @@ require APP_ROOT . '/includes/header.php';
     <h3 class="mb-1"><i class="bi bi-shield-lock"></i> Versleuteling &amp; privacy</h3>
     <p class="text-muted">Wat het betekent om je band end-to-end te versleutelen.</p>
 
+    <div class="card mb-3 border-success">
+        <div class="card-body">
+            <h5><i class="bi bi-person-check-fill text-success me-1"></i> Jouw data blijft van jou</h5>
+            <p>
+                Het uitgangspunt van LiveGig is simpel: <strong>de gegevens die je band invoert,
+                blijven van je band</strong>. Niet wij, niet de hoster en niet een beheerder
+                hebben er iets over te zeggen of inzage in.
+            </p>
+            <p class="mb-0">
+                Het bijzondere is dat dit géén belofte op papier is, maar <strong>technisch wordt
+                afgedwongen</strong>. Door de inhoud op je eigen apparaat te versleutelen vóórdat
+                die wordt opgeslagen, is het voor ons simpelweg <em>onmogelijk</em> om mee te
+                lezen — ook al zouden we willen. Vertrouwen is dus niet nodig: de versleuteling
+                maakt het principe waar.
+            </p>
+        </div>
+    </div>
+
     <div class="card mb-3">
         <div class="card-body">
             <h5><i class="bi bi-lock-fill text-success me-1"></i> Wat is end-to-end-versleuteling?</h5>

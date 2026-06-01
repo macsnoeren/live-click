@@ -48,6 +48,42 @@ require APP_ROOT . '/includes/header.php';
         </div>
     </div>
 
+    <!-- ── Herstelcode (kluis) ───────────────────────────────────────────── -->
+    <div class="card mb-4" id="recovery-card" style="display:none">
+        <div class="card-header"><i class="bi bi-shield-lock-fill me-2"></i>Herstelcode versleuteling</div>
+        <div class="card-body">
+            <div id="rec-alert" class="alert py-2 mb-3" style="display:none"></div>
+            <p class="text-muted small mb-3">
+                Met je herstelcode kun je je versleutelde bands openen als je je wachtwoord vergeet.
+                Eén herstelcode geldt voor al je bands. Ben je 'm kwijt? Genereer hieronder een nieuwe —
+                de oude vervalt dan.
+            </p>
+
+            <div id="rec-locked" class="alert alert-warning py-2 small mb-0" style="display:none">
+                <i class="bi bi-lock me-1"></i>
+                Je kluis is niet ontgrendeld. Log opnieuw in met je wachtwoord om een nieuwe herstelcode te kunnen maken.
+            </div>
+
+            <button class="btn btn-outline-warning" id="rec-gen-btn" onclick="regenerateRecovery()" style="display:none">
+                <i class="bi bi-arrow-repeat"></i> Nieuwe herstelcode genereren
+            </button>
+
+            <!-- Eenmalige weergave van de nieuwe code -->
+            <div id="rec-show" style="display:none">
+                <div class="alert alert-warning py-2 small">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Bewaar deze code op een veilige plek (bv. wachtwoordmanager). Hij wordt <strong>maar één keer</strong> getoond
+                    en vervangt je vorige herstelcode.
+                </div>
+                <div id="rec-code" class="font-monospace fs-5 text-center py-3"
+                     style="background:#1e1e1e;border:1px solid #2e2e2e;border-radius:6px;letter-spacing:0.1em"></div>
+                <button class="btn btn-outline-secondary btn-sm mt-2" onclick="copyRecovery()">
+                    <i class="bi bi-clipboard"></i> Kopiëren
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ── 2FA ───────────────────────────────────────────────────────────── -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -160,6 +196,45 @@ require APP_ROOT . '/includes/header.php';
 
 <?php
 $extraScripts = '<script>
+// ── Herstelcode (kluis) ───────────────────────────────────────────────────
+// Toon de kaart alleen als de gebruiker een sleutelpaar heeft. De genereer-knop
+// werkt alleen als de kluis ontgrendeld is (privésleutel in de sessie).
+$(function() {
+    if (!window.LGKeys) return;
+    $.get("api/keys.php").done(function(st) {
+        if (!st || !st.has_keys) return;            // geen versleuteling in gebruik
+        $("#recovery-card").show();
+        if (LGKeys.keyState() === "unlocked") {
+            $("#rec-gen-btn").show();
+            $("#rec-locked").hide();
+        } else {
+            $("#rec-gen-btn").hide();
+            $("#rec-locked").show();
+        }
+    });
+});
+
+function regenerateRecovery() {
+    if (!window.LGKeys) return;
+    if (!confirm("Een nieuwe herstelcode maken? Je vorige herstelcode vervalt daarmee.")) return;
+    var btn = $("#rec-gen-btn").prop("disabled", true);
+    LGKeys.setupRecovery().then(function(code) {
+        $("#rec-code").text(code);
+        window._recCode = code;
+        $("#rec-show").show();
+        btn.hide();
+    }).catch(function(e) {
+        var el = $("#rec-alert");
+        el.removeClass("alert-success").addClass("alert-danger")
+          .html(\'<i class="bi bi-exclamation-triangle me-1"></i>\' + escHtml(e.message || "Genereren mislukt.")).show();
+        btn.prop("disabled", false);
+    });
+}
+
+function copyRecovery() {
+    navigator.clipboard.writeText(window._recCode || "").catch(function(){});
+}
+
 // ── Change password ──────────────────────────────────────────────────────
 function changePassword() {
     var current = $("#pw-current").val();
