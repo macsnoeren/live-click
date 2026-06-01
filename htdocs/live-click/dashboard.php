@@ -42,7 +42,9 @@ require APP_ROOT . '/includes/header.php';
                     <span id="sl-dash-dur" class="badge bg-secondary" style="display:none"></span>
                 </div>
                 <input type="search" id="dash-search" class="form-control form-control-sm mt-2"
-                       placeholder="Zoek nummer...">
+                       placeholder="Zoek nummer..." autocomplete="off"
+                       autocorrect="off" autocapitalize="off" spellcheck="false"
+                       name="dash-search-nofill">
             </div>
             <div id="setlist-songs" class="list-group list-group-flush db-list">
                 <div class="list-group-item text-muted">Laden...</div>
