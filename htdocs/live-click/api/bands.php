@@ -33,12 +33,12 @@ function getBandsForUser(PDO $db, int $userId, bool $isAdmin): array {
         $b['members'] = $stmt->fetchAll();
 
         // Rol van de huidige gebruiker in deze band, zodat de frontend de juiste
-        // beheerknoppen kan tonen ('leader' geeft ledenbeheer; admin = altijd).
-        $b['my_role'] = $isAdmin ? 'admin' : null;
-        if (!$isAdmin) {
-            foreach ($b['members'] as $m) {
-                if ((int)$m['id'] === $userId) { $b['my_role'] = $m['role']; break; }
-            }
+        // beheerknoppen kan tonen. De admin krijgt GEEN leider-UI: zijn rol is
+        // puur zijn eventuele eigen lidmaatschap (meestal geen). Admin ziet de
+        // bandenlijst alleen om te kunnen verwijderen (admin-paneel).
+        $b['my_role'] = null;
+        foreach ($b['members'] as $m) {
+            if ((int)$m['id'] === $userId) { $b['my_role'] = $m['role']; break; }
         }
     }
     return $bands;
@@ -78,7 +78,8 @@ if ($method === 'POST') {
         if (!in_array($role, ['leader','member','viewer'], true)) {
             echo json_encode(['ok'=>false,'error'=>'Ongeldige rol']); exit;
         }
-        if (!$isAdmin && !isBandLeader($db, $bandId, $user['id'])) {
+        // Alleen de bandleider mag rollen wijzigen — de admin niet.
+        if (!isBandLeader($db, $bandId, $user['id'])) {
             echo json_encode(['ok'=>false,'error'=>'Alleen de bandleider mag rollen wijzigen']); exit;
         }
         if (!isBandMember($db, $bandId, $targetId)) {
@@ -102,52 +103,22 @@ if ($method === 'POST') {
     $id        = (int)($data['id'] ?? 0);
     $name      = trim($data['name'] ?? '');
     $desc      = trim($data['description'] ?? '');
-    $memberIds = $data['member_ids'] ?? null;
 
     if (!$name) { echo json_encode(['ok' => false, 'error' => 'Naam verplicht']); exit; }
 
     if ($id) {
-        // Edit — only leader of this band or site admin
-        if (!$isAdmin && !isBandLeader($db, $id, $user['id'])) {
+        // Bewerken — alleen de bandleider. De admin heeft hier geen rechten
+        // (bandnaam/leden vallen onder leiderschap, niet onder accountbeheer).
+        if (!isBandLeader($db, $id, $user['id'])) {
             echo json_encode(['ok' => false, 'error' => 'Alleen de bandleider mag de band bewerken']); exit;
         }
         $db->prepare('UPDATE bands SET name=?,description=? WHERE id=?')->execute([$name, $desc, $id]);
-
-        // Admin member-list replacement: preserve existing roles
-        if ($isAdmin && $memberIds !== null) {
-            $cur = $db->prepare('SELECT user_id, role FROM band_members WHERE band_id=?');
-            $cur->execute([$id]);
-            $roleMap = [];
-            foreach ($cur->fetchAll() as $m) $roleMap[(int)$m['user_id']] = $m['role'];
-
-            $db->prepare('DELETE FROM band_members WHERE band_id=?')->execute([$id]);
-            $ins = $db->prepare('INSERT OR IGNORE INTO band_members (user_id,band_id,role) VALUES (?,?,?)');
-            foreach ($memberIds as $uid) {
-                $uid  = (int)$uid;
-                $role = $roleMap[$uid] ?? 'member';
-                $ins->execute([$uid, $id, $role]);
-            }
-        }
     } else {
-        // Create — any logged-in user; creator becomes leader
+        // Aanmaken — elke ingelogde gebruiker; de maker wordt leider.
         $db->prepare('INSERT INTO bands (name,description) VALUES (?,?)')->execute([$name, $desc]);
         $id = $db->lastInsertId();
-
-        if ($isAdmin && $memberIds !== null) {
-            $ins = $db->prepare('INSERT OR IGNORE INTO band_members (user_id,band_id,role) VALUES (?,?,?)');
-            foreach ($memberIds as $uid) {
-                $role = ((int)$uid === (int)$user['id']) ? 'leader' : 'member';
-                $ins->execute([(int)$uid, $id, $role]);
-            }
-            // Ensure the admin creating the band is always added as leader
-            if (!in_array((int)$user['id'], array_map('intval', $memberIds))) {
-                $db->prepare('INSERT OR IGNORE INTO band_members (user_id,band_id,role) VALUES (?,?,?)')
-                   ->execute([$user['id'], $id, 'leader']);
-            }
-        } else {
-            $db->prepare('INSERT OR IGNORE INTO band_members (user_id,band_id,role) VALUES (?,?,?)')
-               ->execute([$user['id'], $id, 'leader']);
-        }
+        $db->prepare('INSERT OR IGNORE INTO band_members (user_id,band_id,role) VALUES (?,?,?)')
+           ->execute([$user['id'], $id, 'leader']);
     }
 
     echo json_encode(['ok' => true, 'id' => $id]);
@@ -165,13 +136,13 @@ if ($method === 'DELETE') {
     if ($bandId && $userId) {
         $isSelf = ($userId === (int)$user['id']);
 
-        // Removing someone else: only leader or admin
-        if (!$isSelf && !$isAdmin && !isBandLeader($db, $bandId, $user['id'])) {
+        // Iemand anders verwijderen: alleen de bandleider (admin heeft hier geen rol).
+        if (!$isSelf && !isBandLeader($db, $bandId, $user['id'])) {
             echo json_encode(['ok' => false, 'error' => 'Alleen de bandleider mag leden verwijderen']); exit;
         }
 
-        // Removing yourself (leave): always allowed — even for leaders
-        if (!$isSelf && !$isAdmin && !isBandMember($db, $bandId, $user['id'])) {
+        // Jezelf verwijderen (verlaten): altijd toegestaan, mits je lid bent.
+        if (!$isSelf && !isBandMember($db, $bandId, $user['id'])) {
             echo json_encode(['ok' => false, 'error' => 'Geen toegang']); exit;
         }
 

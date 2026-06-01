@@ -36,10 +36,11 @@ require APP_ROOT . '/includes/header.php';
         <div class="tab-pane fade" id="tab-bands">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h5 class="mb-0">Bands</h5>
-                <button class="btn btn-danger btn-sm" onclick="openAddBand()">
-                    <i class="bi bi-plus-lg"></i> Band toevoegen
-                </button>
             </div>
+            <p class="text-muted small">
+                Als beheerder kun je bands alleen <strong>verwijderen</strong> (opschonen).
+                Aanmaken, hernoemen, leden en versleuteling beheren de bandleiders zelf.
+            </p>
             <div id="bands-container" class="row g-3">
                 <div class="col-12 text-muted">Laden...</div>
             </div>
@@ -85,10 +86,6 @@ require APP_ROOT . '/includes/header.php';
                         </label>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Bands</label>
-                    <div id="user-bands-list"></div>
-                </div>
             </div>
             <div class="modal-footer border-secondary">
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
@@ -98,32 +95,23 @@ require APP_ROOT . '/includes/header.php';
     </div>
 </div>
 
-<!-- Band Modal -->
-<div class="modal fade" id="bandModal" tabindex="-1">
-    <div class="modal-dialog">
+<!-- Band verwijderen: bevestiging -->
+<div class="modal fade" id="deleteBandModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
         <div class="modal-content bg-dark">
             <div class="modal-header border-secondary">
-                <h5 class="modal-title" id="bandModalTitle">Band toevoegen</h5>
+                <h5 class="modal-title">Band verwijderen</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="band-id">
-                <div class="mb-3">
-                    <label class="form-label">Bandnaam *</label>
-                    <input type="text" id="band-name" class="form-control">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Beschrijving</label>
-                    <textarea id="band-description" class="form-control" rows="2"></textarea>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Leden</label>
-                    <div id="band-members-list"></div>
+                Weet je zeker dat je <strong id="del-band-name"></strong> wilt verwijderen?
+                <div class="small text-warning mt-2">
+                    <i class="bi bi-exclamation-triangle"></i> Alle nummers en setlists van deze band worden ook verwijderd.
                 </div>
             </div>
             <div class="modal-footer border-secondary">
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
-                <button class="btn btn-danger" onclick="saveBand()">Opslaan</button>
+                <button class="btn btn-danger" onclick="confirmDeleteBand()">Verwijderen</button>
             </div>
         </div>
     </div>
@@ -174,14 +162,36 @@ function renderBands(bands) {
     if (!bands.length) { c.html(\'<div class="col-12 text-muted">Nog geen bands</div>\'); return; }
     bands.forEach(function(b) {
         var members = (b.members || []).map(function(m){ return escHtml(m.username); }).join(", ");
+        var enc = (b.is_encrypted == 1)
+            ? \' <i class="bi bi-shield-lock-fill text-success" title="Versleuteld"></i>\' : "";
         c.append(\'<div class="col-md-6 col-lg-4">\'
             + \'<div class="card"><div class="card-body">\'
             + \'<div class="d-flex justify-content-between align-items-start">\'
-            + \'<div><h6 class="fw-bold mb-1">\' + escHtml(b.name) + \'</h6>\'
+            + \'<div><h6 class="fw-bold mb-1">\' + escHtml(b.name) + enc + \'</h6>\'
             + \'<p class="text-muted small mb-1">\' + escHtml(b.description || "") + \'</p>\'
             + \'<p class="small mb-0">Leden: \' + (members || "—") + \'</p></div>\'
-            + \'<button class="btn btn-xs btn-outline-secondary" onclick="openEditBand(\' + b.id + \')"><i class="bi bi-pencil"></i></button>\'
+            + \'<button class="btn btn-xs btn-outline-danger" onclick="askDeleteBand(\' + b.id + \')" title="Band verwijderen"><i class="bi bi-trash"></i></button>\'
             + \'</div></div></div></div>\');
+    });
+}
+
+var _delBandId = null;
+function askDeleteBand(id) {
+    var b = _allBands.find(function(x){ return x.id === id; });
+    _delBandId = id;
+    $("#del-band-name").text(b ? b.name : "deze band");
+    new bootstrap.Modal("#deleteBandModal").show();
+}
+function confirmDeleteBand() {
+    if (!_delBandId) return;
+    $.ajax({ url: "api/bands.php", type: "DELETE", contentType: "application/json",
+        data: JSON.stringify({ id: _delBandId }), dataType: "json",
+        success: function(r) {
+            bootstrap.Modal.getInstance("#deleteBandModal").hide();
+            if (r.ok) { loadBands(); loadUsers(); }
+            else alert(r.error || "Verwijderen mislukt");
+        },
+        error: function(xhr) { alert("Verwijderen mislukt (HTTP " + xhr.status + ")"); }
     });
 }
 
@@ -190,7 +200,6 @@ function openAddUser() {
     $("#user-id").val(""); $("#user-username").val(""); $("#user-email").val("");
     $("#user-password").val(""); $("#user-role").val("user");
     $("#user-must-change-password").prop("checked", false);
-    renderUserBandCheckboxes([]);
     new bootstrap.Modal("#userModal").show();
 }
 
@@ -201,72 +210,19 @@ function openEditUser(id) {
     $("#user-id").val(u.id); $("#user-username").val(u.username); $("#user-email").val(u.email);
     $("#user-password").val(""); $("#user-role").val(u.role);
     $("#user-must-change-password").prop("checked", !!u.must_change_password);
-    renderUserBandCheckboxes((u.bands||[]).map(function(b){return b.id;}));
     new bootstrap.Modal("#userModal").show();
 }
 
-function renderUserBandCheckboxes(selectedIds) {
-    var c = $("#user-bands-list"); c.empty();
-    _allBands.forEach(function(b) {
-        c.append(\'<div class="form-check">\'
-            + \'<input class="form-check-input" type="checkbox" id="ub_\' + b.id + \'" value="\' + b.id + \'" \' + (selectedIds.includes(b.id) ? "checked" : "") + \'>\'
-            + \'<label class="form-check-label" for="ub_\' + b.id + \'">\' + escHtml(b.name) + \'</label>\'
-            + \'</div>\');
-    });
-}
-
 function saveUser() {
-    var bandIds = [];
-    $("#user-bands-list input:checked").each(function() { bandIds.push(parseInt($(this).val())); });
     var data = {
         id: $("#user-id").val(), username: $("#user-username").val().trim(),
         email: $("#user-email").val().trim(), password: $("#user-password").val(),
-        role: $("#user-role").val(), band_ids: bandIds,
+        role: $("#user-role").val(),
         must_change_password: $("#user-must-change-password").is(":checked") ? 1 : 0
     };
     if (!data.username || !data.email) { alert("Gebruikersnaam en e-mail zijn verplicht."); return; }
     $.post("api/users.php", JSON.stringify(data), function(r) {
-        if (r.ok) { bootstrap.Modal.getInstance("#userModal").hide(); loadUsers(); loadBands(); }
-        else { alert(r.error || "Fout"); }
-    }, "json");
-}
-
-function openAddBand() {
-    $("#bandModalTitle").text("Band toevoegen");
-    $("#band-id").val(""); $("#band-name").val(""); $("#band-description").val("");
-    renderBandMemberCheckboxes([]);
-    new bootstrap.Modal("#bandModal").show();
-}
-
-function openEditBand(id) {
-    var b = _allBands.find(function(x) { return x.id === id; });
-    if (!b) return;
-    $("#bandModalTitle").text("Band bewerken");
-    $("#band-id").val(b.id); $("#band-name").val(b.name); $("#band-description").val(b.description||"");
-    renderBandMemberCheckboxes((b.members||[]).map(function(m){return m.id;}));
-    new bootstrap.Modal("#bandModal").show();
-}
-
-function renderBandMemberCheckboxes(selectedIds) {
-    var c = $("#band-members-list"); c.empty();
-    _allUsers.forEach(function(u) {
-        c.append(\'<div class="form-check">\'
-            + \'<input class="form-check-input" type="checkbox" id="bm_\' + u.id + \'" value="\' + u.id + \'" \' + (selectedIds.includes(u.id) ? "checked" : "") + \'>\'
-            + \'<label class="form-check-label" for="bm_\' + u.id + \'">\' + escHtml(u.username) + \'</label>\'
-            + \'</div>\');
-    });
-}
-
-function saveBand() {
-    var memberIds = [];
-    $("#band-members-list input:checked").each(function() { memberIds.push(parseInt($(this).val())); });
-    var data = {
-        id: $("#band-id").val(), name: $("#band-name").val().trim(),
-        description: $("#band-description").val().trim(), member_ids: memberIds
-    };
-    if (!data.name) { alert("Bandnaam is verplicht."); return; }
-    $.post("api/bands.php", JSON.stringify(data), function(r) {
-        if (r.ok) { bootstrap.Modal.getInstance("#bandModal").hide(); loadBands(); loadUsers(); }
+        if (r.ok) { bootstrap.Modal.getInstance("#userModal").hide(); loadUsers(); }
         else { alert(r.error || "Fout"); }
     }, "json");
 }

@@ -10,7 +10,9 @@ $user   = currentUser();
 $method = $_SERVER['REQUEST_METHOD'];
 
 function canManageInvite(PDO $db, int $bandId, int $userId, bool $isAdmin): bool {
-    if ($isAdmin) return true;
+    // Alleen de bandleider; de globale admin beheert geen uitnodigingslinks
+    // (uitnodigen = leden toevoegen aan een band — dat is leiderschap, geen
+    // accountbeheer). $isAdmin blijft als parameter staan voor de GET-zichtbaarheid.
     $s = $db->prepare("SELECT 1 FROM band_members WHERE band_id=? AND user_id=? AND role='leader'");
     $s->execute([$bandId, $userId]);
     return (bool)$s->fetch();

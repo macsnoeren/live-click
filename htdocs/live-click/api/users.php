@@ -30,7 +30,6 @@ if ($method === 'POST') {
     $email              = trim($data['email'] ?? '');
     $password           = $data['password'] ?? '';
     $role               = in_array($data['role']??'', ['admin','user']) ? $data['role'] : 'user';
-    $bandIds            = $data['band_ids'] ?? [];
     $mustChangePassword = isset($data['must_change_password']) ? (int)(bool)$data['must_change_password'] : 0;
 
     if (!$username || !$email) { echo json_encode(['ok'=>false,'error'=>'Gebruikersnaam en e-mail verplicht']); exit; }
@@ -61,10 +60,8 @@ if ($method === 'POST') {
         }
     }
 
-    $db->prepare('DELETE FROM band_members WHERE user_id=?')->execute([$id]);
-    $ins = $db->prepare('INSERT OR IGNORE INTO band_members (user_id,band_id) VALUES (?,?)');
-    foreach ($bandIds as $bid) { $ins->execute([$id,(int)$bid]); }
-
+    // Bandlidmaatschap wordt NIET meer door de admin beheerd — leiders regelen
+    // dat zelf via uitnodigingen en rollen. De admin beheert alleen het account.
     echo json_encode(['ok'=>true,'id'=>$id]);
     exit;
 }

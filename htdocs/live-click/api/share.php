@@ -10,7 +10,8 @@ $method = $_SERVER['REQUEST_METHOD'];
 $user   = currentUser();
 
 function canManageBand(PDO $db, int $bandId, array $user): bool {
-    if ($user['role'] === 'admin') return true;
+    // Alleen de bandleider; de globale admin heeft hier bewust GEEN rechten
+    // (deellinks bevatten band-inhoud — zie PRIVACY.md).
     $s = $db->prepare("SELECT 1 FROM band_members WHERE band_id=? AND user_id=? AND role='leader'");
     $s->execute([$bandId, $user['id']]);
     return (bool)$s->fetch();

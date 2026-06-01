@@ -480,13 +480,17 @@ function safeLocalRedirect(string $candidate, string $fallback): string {
 // ── Band-access helpers ──────────────────────────────────────────────────────
 
 /**
- * Is de huidige (of meegegeven) user lid van $bandId, of admin?
- * Geeft true voor admin onafhankelijk van lidmaatschap.
+ * Is de huidige (of meegegeven) user lid van $bandId?
+ *
+ * LET OP: de globale admin krijgt hier BEWUST GEEN automatische toegang meer.
+ * Een admin beheert accounts en kan bands verwijderen, maar heeft geen inzage in
+ * of zeggenschap over de inhoud van een band waar hij geen lid van is. Dit sluit
+ * aan op het privacymodel (zie PRIVACY.md): zonder lidmaatschap geen banddata —
+ * en bij versleutelde bands kan de admin sowieso niet ontsleutelen.
  */
 function userCanAccessBand(int $bandId, ?int $userId = null): bool {
     $user = currentUser();
     if (!$user) return false;
-    if ($user['role'] === 'admin') return true;
     $uid = $userId ?? (int)$user['id'];
     $db  = getDB();
     $s   = $db->prepare('SELECT 1 FROM band_members WHERE band_id=? AND user_id=?');
@@ -513,7 +517,9 @@ function requireBandAccess(int $bandId): void {
 //   'member'  — bewerkt inhoud, maar beheert geen leden
 //   'viewer'  — mag alleen bekijken (dashboard/tekst/PDF), niets wijzigen
 //
-// De globale admin (users.role = 'admin') mag alles, ongeacht lidmaatschap.
+// De globale admin (users.role = 'admin') heeft GEEN bandrechten: hij beheert
+// accounts en kan bands verwijderen, maar mag de inhoud van een band niet
+// inzien/bewerken en niet de leden/rollen/kluis beheren tenzij hij zelf lid is.
 
 /** Bandrol van de (huidige of opgegeven) user: 'leader'|'member'|'viewer' of null. */
 function userBandRole(int $bandId, ?int $userId = null): ?string {
@@ -526,19 +532,15 @@ function userBandRole(int $bandId, ?int $userId = null): ?string {
     return $role === false ? null : (string)$role;
 }
 
-/** Mag de huidige user inhoud (nummers/setlists/PDF/tekst) van $bandId bewerken? */
+/** Mag de huidige user inhoud (nummers/setlists/PDF/tekst) van $bandId bewerken?
+ *  Admin telt hier NIET mee — alleen echt lidmaatschap als leider/lid. */
 function userCanEditBandContent(int $bandId, ?int $userId = null): bool {
-    $user = currentUser();
-    if (!$user) return false;
-    if ($user['role'] === 'admin') return true;
     return in_array(userBandRole($bandId, $userId), ['leader', 'member'], true);
 }
 
-/** Is de huidige user leider van $bandId (of globale admin)? */
+/** Is de huidige user leider van $bandId?
+ *  Admin telt hier NIET mee — alleen een echte band-leider. */
 function userIsBandLeader(int $bandId, ?int $userId = null): bool {
-    $user = currentUser();
-    if (!$user) return false;
-    if ($user['role'] === 'admin') return true;
     return userBandRole($bandId, $userId) === 'leader';
 }
 

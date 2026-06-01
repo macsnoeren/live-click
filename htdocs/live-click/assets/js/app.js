@@ -54,7 +54,31 @@ function lgSave(type, bandId, data) {
         localStorage.setItem(_lgKey(type, bandId), JSON.stringify(data));
         localStorage.setItem('lg_ts_' + bandId, Date.now());
     } catch (e) { /* quota overschreden — geen actie */ }
+    // Houd de cache klein: bewaar alleen de huidige band, ruim de rest op.
+    lgPurgeOtherBands(bandId);
     if (typeof window.updateLsUsage === 'function') window.updateLsUsage();
+}
+
+/**
+ * Verwijdert alle offline-cache van ándere bands uit localStorage, zodat alleen
+ * de huidige band gecachet blijft (ruimtebesparing). Raakt uitsluitend de
+ * cache-sleutels (lg_songs_/lg_setlists_/lg_ts_) — niet eventuele andere data.
+ * E2EE-sleutels staan in sessionStorage en blijven dus sowieso ongemoeid.
+ */
+function lgPurgeOtherBands(keepBandId) {
+    keepBandId = String(keepBandId);
+    try {
+        var remove = [];
+        for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (!k) continue;
+            // Cache-data per band: lg_songs_<id>_v<n> / lg_setlists_<id>_v<n>
+            var m = k.match(/^lg_(?:songs|setlists)_(\d+)_v\d+$/);
+            if (!m) m = k.match(/^lg_ts_(\d+)$/);   // tijdstempel per band
+            if (m && m[1] !== keepBandId) remove.push(k);
+        }
+        remove.forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) { /* geen toegang tot localStorage — niets te doen */ }
 }
 
 function lgLoad(type, bandId) {

@@ -157,11 +157,14 @@ require APP_ROOT . '/includes/header.php';
 </div>
 
 <?php
-$isAdmin = $user['role'] === 'admin';
+// Op deze pagina telt de admin NIET als beheerder: bandbeheer (versleutelen,
+// leden, rollen, deellinks) is voorbehouden aan bandleiders. De admin beheert
+// bands alleen via het Admin-paneel (verwijderen). _isAdmin blijft daarom false;
+// is de admin zelf lid van een band, dan gelden gewoon zijn bandrol-rechten.
 $extraScripts = '<script>
 var _allBands  = [];
 var _allUsers  = [];
-var _isAdmin   = ' . ($isAdmin ? 'true' : 'false') . ';
+var _isAdmin   = false;
 var _myUserId  = ' . (int)$user['id'] . ';
 var _deleteBandId = null;
 var _leaveBandId  = null;
@@ -169,7 +172,6 @@ var _leaveBandName = "";
 
 $(function() {
     loadBands();
-    ' . ($isAdmin ? 'loadAllUsers();' : '') . '
 });
 
 function loadBands() {
