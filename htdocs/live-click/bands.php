@@ -38,12 +38,27 @@ require APP_ROOT . '/includes/header.php';
                     <label class="form-label">Beschrijving</label>
                     <textarea id="band-description" class="form-control" rows="2"></textarea>
                 </div>
-                <?php if ($user['role'] === 'admin'): ?>
-                <div class="mb-3">
-                    <label class="form-label">Leden</label>
-                    <div id="band-members-checkboxes" class="small"></div>
+
+                <!-- Versleuteling: standaard aan bij het aanmaken van een band -->
+                <div id="band-encrypt-section" class="mb-1" style="display:none">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="band-encrypt" checked>
+                        <label class="form-check-label" for="band-encrypt">
+                            <i class="bi bi-shield-lock text-success me-1"></i>
+                            <strong>Band versleutelen</strong> (aanbevolen)
+                        </label>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">
+                        Alle inhoud wordt end-to-end versleuteld; alleen bandleden kunnen het lezen.
+                        Je krijgt eenmalig een herstelcode.
+                        <a href="privacy.php" target="_blank" rel="noopener">Lees wat dit inhoudt</a>.
+                        Zet je dit uit, dan kan de serverbeheerder de inhoud inzien.
+                    </p>
+                    <div id="band-encrypt-unsupported" class="alert alert-warning py-2 small mt-2 mb-0" style="display:none">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Versleuteling is niet beschikbaar in deze browser (vereist HTTPS). De band wordt onversleuteld aangemaakt.
+                    </div>
                 </div>
-                <?php endif; ?>
             </div>
             <div class="modal-footer border-secondary">
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
@@ -219,11 +234,6 @@ function refreshVaultStatus(bandId) {
     }).catch(function(){});
 }
 
-function loadAllUsers() {
-    $.get("api/users.php", function(data) {
-        _allUsers = data.users || [];
-    });
-}
 
 function isLeaderOf(b) {
     return (b.members || []).some(function(m) { return m.id == _myUserId && m.role === "leader"; });
@@ -416,7 +426,11 @@ function openAddBand() {
     $("#band-id").val("");
     $("#band-name").val("");
     $("#band-description").val("");
-    if (_isAdmin) renderMemberCheckboxes([]);
+    // Versleutel-optie tonen (alleen bij aanmaken), standaard aan.
+    var canEncrypt = !!(window.LGVault && window.LGKeys && LGKeys.keyState() !== "unsupported");
+    $("#band-encrypt-section").show();
+    $("#band-encrypt").prop("checked", canEncrypt).prop("disabled", !canEncrypt);
+    $("#band-encrypt-unsupported").toggle(!canEncrypt);
     new bootstrap.Modal("#bandModal").show();
 }
 
@@ -427,34 +441,50 @@ function openEditBand(i) {
     $("#band-id").val(b.id);
     $("#band-name").val(b.name);
     $("#band-description").val(b.description || "");
-    if (_isAdmin) renderMemberCheckboxes((b.members || []).map(function(m){ return m.id; }));
+    $("#band-encrypt-section").hide(); // versleutelen gebeurt apart, niet bij bewerken
     new bootstrap.Modal("#bandModal").show();
-}
-
-function renderMemberCheckboxes(selectedIds) {
-    var c = $("#band-members-checkboxes"); c.empty();
-    if (!_allUsers.length) { c.text("Geen gebruikers beschikbaar."); return; }
-    _allUsers.forEach(function(u) {
-        c.append(\'<div class="form-check">\'
-            + \'<input class="form-check-input" type="checkbox" id="bm_\' + u.id + \'" value="\' + u.id + \'" \' + (selectedIds.includes(u.id) ? "checked" : "") + \'>\'
-            + \'<label class="form-check-label" for="bm_\' + u.id + \'">\' + escHtml(u.username) + \'</label>\'
-            + \'</div>\');
-    });
 }
 
 function saveBand() {
     var name = $("#band-name").val().trim();
     if (!name) { alert("Bandnaam is verplicht."); return; }
-    var data = { id: $("#band-id").val(), name: name, description: $("#band-description").val().trim() };
-    if (_isAdmin) {
-        var memberIds = [];
-        $("#band-members-checkboxes input:checked").each(function() { memberIds.push(parseInt($(this).val())); });
-        data.member_ids = memberIds;
-    }
+    var id = $("#band-id").val();
+    var data = { id: id, name: name, description: $("#band-description").val().trim() };
+    var wantEncrypt = !id && $("#band-encrypt-section").is(":visible")
+                      && $("#band-encrypt").is(":checked") && !$("#band-encrypt").prop("disabled");
+
     $.post("api/bands.php", JSON.stringify(data), function(r) {
-        if (r.ok) { bootstrap.Modal.getInstance("#bandModal").hide(); loadBands(); }
-        else { alert(r.error || "Fout bij opslaan"); }
+        if (!r.ok) { alert(r.error || "Fout bij opslaan"); return; }
+        bootstrap.Modal.getInstance("#bandModal").hide();
+        if (wantEncrypt && r.id) {
+            // Nieuwe band meteen versleutelen (kluis aanzetten + herstelcode tonen).
+            enableVaultForNewBand(r.id);
+        } else {
+            loadBands();
+        }
     }, "json");
+}
+
+// Versleutelt een zojuist aangemaakte band en toont de herstelcode.
+function enableVaultForNewBand(bandId) {
+    if (!window.LGVault || !window.LGKeys) { loadBands(); return; }
+    if (LGKeys.keyState() !== "unlocked") {
+        alert("Je kluis is nog niet ontgrendeld; de band is onversleuteld aangemaakt. Je kunt hem later versleutelen via \'Band versleutelen\'.");
+        loadBands(); return;
+    }
+    LGVault.enableVault(bandId).then(function() {
+        return fetch("api/keys.php", {credentials:"same-origin", headers:{Accept:"application/json"}})
+            .then(function(r){ return r.json(); })
+            .then(function(st) {
+                if (st.ok && !st.has_recovery) {
+                    return LGKeys.setupRecovery().then(function(code) { showRecoveryCode(code); });
+                }
+                loadBands();
+            });
+    }).catch(function(e) {
+        alert("Band aangemaakt, maar versleutelen mislukte: " + (e.message || "onbekende fout") + "\\nJe kunt het later opnieuw proberen via \'Band versleutelen\'.");
+        loadBands();
+    });
 }
 
 // ---- Member removal ----
