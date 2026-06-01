@@ -58,9 +58,20 @@ if ($method === 'POST') {
     $name   = trim($data['name'] ?? '');
     $bandId = (int)($data['band_id'] ?? 0);
     $songs  = $data['songs'] ?? [];
+    // E2EE: bij een versleutelde band zit de naam in enc_blob i.p.v. name.
+    $encBlob = isset($data['enc_blob']) && trim($data['enc_blob']) !== '' ? trim($data['enc_blob']) : null;
 
-    if (!$name || !$bandId) { echo json_encode(['ok'=>false,'error'=>'Naam en band verplicht']); exit; }
+    if (!$bandId) { echo json_encode(['ok'=>false,'error'=>'Band verplicht']); exit; }
     requireBandContentAccess($bandId);
+
+    $encrypted = bandIsEncrypted($bandId);
+    if ($encrypted) {
+        if ($encBlob === null) { echo json_encode(['ok'=>false,'error'=>'Deze band is versleuteld; geen versleutelde naam meegegeven.']); exit; }
+        if (strlen($encBlob) > 20000) { echo json_encode(['ok'=>false,'error'=>'Naam te lang.']); exit; }
+        $name = ''; // placeholder; echte naam zit in enc_blob
+    } elseif (!$name) {
+        echo json_encode(['ok'=>false,'error'=>'Naam en band verplicht']); exit;
+    }
 
     if ($id) {
         // Bij update: controleer huidige eigenaarband (mag niet via "id" naar andere band gesleept worden zonder toegang).
@@ -75,10 +86,10 @@ if ($method === 'POST') {
             echo json_encode(['ok' => false, 'error' => 'Je hebt alleen leesrechten voor deze setlist.']);
             exit;
         }
-        $db->prepare('UPDATE setlists SET name=? WHERE id=?')->execute([$name,$id]);
+        $db->prepare('UPDATE setlists SET name=?, enc_blob=? WHERE id=?')->execute([$name, $encBlob, $id]);
         $db->prepare('DELETE FROM setlist_songs WHERE setlist_id=?')->execute([$id]);
     } else {
-        $db->prepare('INSERT INTO setlists (name,band_id,created_by) VALUES (?,?,?)')->execute([$name,$bandId,currentUser()['id']]);
+        $db->prepare('INSERT INTO setlists (name,band_id,created_by,enc_blob) VALUES (?,?,?,?)')->execute([$name,$bandId,currentUser()['id'],$encBlob]);
         $id = $db->lastInsertId();
     }
 

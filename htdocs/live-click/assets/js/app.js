@@ -240,6 +240,23 @@ function _sortSetlists(lists) {
     });
 }
 
+/* E2EE: ontsleutel setlijstnamen indien versleuteld (anders no-op). */
+function _lgDecryptSetlistNames(bandId, lists) {
+    if (window.LGVault && lists && lists.some(function(sl){ return sl && sl.enc_blob; })) {
+        return LGVault.decryptSetlists(bandId, lists);
+    }
+    return Promise.resolve(lists || []);
+}
+
+/* Ontsleutel namen, sorteer alfabetisch, render de dropdown-opties. */
+function _prepareAndRenderSetlists(bandId, lists) {
+    _lgDecryptSetlistNames(bandId, lists).then(function() {
+        _sortSetlists(lists);
+        _renderSetlistOptions(lists);
+        _decryptSetlistSongs(bandId, lists);
+    });
+}
+
 function loadSetlistDropdown() {
     var bandId = typeof BAND_ID !== 'undefined' ? BAND_ID : null;
     if (!bandId) return;
@@ -247,20 +264,15 @@ function loadSetlistDropdown() {
     // Toon gecachede data meteen
     var cached = lgLoad('setlists', bandId);
     if (cached) {
-        _sortSetlists(cached);
-        _renderSetlistOptions(cached);
-        // Index de nummers uit de setlists (ontsleuteld) voor offline gebruik
-        _decryptSetlistSongs(bandId, cached);
+        _prepareAndRenderSetlists(bandId, cached);
     }
 
     // Haal verse data op op de achtergrond
     $.get('api/setlists.php?band_id=' + bandId)
         .done(function(data) {
             var lists = data.setlists || [];
-            _sortSetlists(lists);
-            lgSave('setlists', bandId, lists);
-            _renderSetlistOptions(lists);
-            _decryptSetlistSongs(bandId, lists);
+            lgSave('setlists', bandId, lists); // ruwe (eventueel versleutelde) data cachen
+            _prepareAndRenderSetlists(bandId, lists);
             lgSetOffline(false);
         })
         .fail(function() {
@@ -329,9 +341,11 @@ function loadSetlist(id) {
         if (cached) {
             for (var i = 0; i < cached.length; i++) {
                 if (cached[i].id === id) {
-                    lgDecryptSongs(bandId, cached[i].songs || []).then(function(songs) {
-                        var sl = cached[i]; sl.songs = songs; _applySetlist(sl);
-                    });
+                    var sl = cached[i];
+                    // Naam ontsleutelen, dan de nummers, dan tonen.
+                    _lgDecryptSetlistNames(bandId, [sl])
+                        .then(function() { return lgDecryptSongs(bandId, sl.songs || []); })
+                        .then(function(songs) { sl.songs = songs; _applySetlist(sl); });
                     return;
                 }
             }
@@ -341,9 +355,10 @@ function loadSetlist(id) {
     // Fallback naar API (vereist netwerk)
     $.get('api/setlists.php?id=' + id, function(data) {
         if (!data.setlist) return;
-        lgDecryptSongs(bandId, data.setlist.songs || []).then(function(songs) {
-            data.setlist.songs = songs; _applySetlist(data.setlist);
-        });
+        var sl = data.setlist;
+        _lgDecryptSetlistNames(bandId, [sl])
+            .then(function() { return lgDecryptSongs(bandId, sl.songs || []); })
+            .then(function(songs) { sl.songs = songs; _applySetlist(sl); });
     });
 }
 

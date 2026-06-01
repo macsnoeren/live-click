@@ -19,6 +19,9 @@ require APP_ROOT . '/includes/header.php';
         <div class="d-flex gap-2">
             <input type="search" id="song-filter" class="form-control form-control-sm" placeholder="Zoeken..." style="width:200px">
             <?php if ($canEdit): ?>
+            <button class="btn btn-outline-secondary btn-sm" onclick="openImport()" title="Nummers importeren uit een andere band">
+                <i class="bi bi-box-arrow-in-down"></i> Importeren
+            </button>
             <button class="btn btn-danger btn-sm" onclick="openAddSong()">
                 <i class="bi bi-plus-lg"></i> Nummer toevoegen
             </button>
@@ -224,6 +227,50 @@ define('SPOTIFY_CLIENT_SECRET', 'jouw_secret');</pre>
     </div>
 </div>
 
+<!-- Import from another band -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-box-arrow-in-down"></i> Nummers importeren</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">
+                    Kopieer nummers uit een andere band waarvan je lid of leider bent.
+                    De inhoud wordt in je browser ontsleuteld en opnieuw versleuteld voor déze band —
+                    de server ziet nooit de leesbare inhoud.
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">Bron-band</label>
+                    <select id="import-band" class="form-select" onchange="loadImportSongs()">
+                        <option value="">— kies band —</option>
+                    </select>
+                </div>
+                <div id="import-alert" class="alert alert-warning py-2 small" style="display:none"></div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <input type="search" id="import-filter" class="form-control form-control-sm" placeholder="Filteren..." style="width:200px"
+                           oninput="renderImportSongs()">
+                    <div class="small">
+                        <a href="#" onclick="importSelectAll(true);return false;">Alles</a> ·
+                        <a href="#" onclick="importSelectAll(false);return false;">Niets</a>
+                    </div>
+                </div>
+                <div id="import-list" class="list-group" style="max-height:340px;overflow-y:auto">
+                    <div class="list-group-item text-muted">Kies eerst een band.</div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <span id="import-progress" class="text-muted small me-auto"></span>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
+                <button type="button" class="btn btn-danger" id="import-confirm" onclick="doImport()" disabled>
+                    <i class="bi bi-box-arrow-in-down"></i> Importeer geselecteerde
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Delete confirm -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
@@ -250,6 +297,7 @@ var _songsList = [];
 var _canEdit = ' . ($canEdit ? 'true' : 'false') . ';
 var BAND_ID = ' . ($user['band_id'] ? (int)$user['band_id'] : 'null') . ';
 var BAND_ENCRYPTED = ' . ($bandEncrypted ? 'true' : 'false') . ';
+var _myUserId = ' . (int)$user['id'] . ';
 $(function() { loadSongsTable(); });
 
 function loadSongsTable() {
@@ -262,6 +310,140 @@ function loadSongsTable() {
             renderSongsTable(_songsList);
             migratePlaintextSongs(songs);
         });
+    });
+}
+
+/* =========================================
+   Importeren uit een andere band (fase 6)
+   Lid/leider in beide bands; client-side her-versleutelen.
+   ========================================= */
+var _importSongs = [];     // ontsleutelde nummers van de bron-band
+var _importBandId = null;
+
+function openImport() {
+    $("#import-band").html(\'<option value="">— kies band —</option>\');
+    $("#import-list").html(\'<div class="list-group-item text-muted">Kies eerst een band.</div>\');
+    $("#import-alert").hide();
+    $("#import-confirm").prop("disabled", true);
+    $("#import-progress").text("");
+    _importSongs = []; _importBandId = null;
+
+    // Andere bands ophalen waar de gebruiker lid/leider van is (geen kijker).
+    $.get("api/bands.php", function(data) {
+        var bands = (data.bands || []).filter(function(b) {
+            if (b.id == BAND_ID) return false;
+            if (b.my_role === "admin" || b.my_role === "leader" || b.my_role === "member") return true;
+            // fallback: rol uit ledenlijst
+            var me = (b.members || []).find(function(m){ return m.id == _myUserId; });
+            return me && (me.role === "leader" || me.role === "member");
+        });
+        if (!bands.length) {
+            $("#import-band").html(\'<option value="">Geen andere bands beschikbaar</option>\');
+        } else {
+            var opts = \'<option value="">— kies band —</option>\';
+            bands.forEach(function(b) { opts += \'<option value="\' + b.id + \'">\' + escHtml(b.name) + \'</option>\'; });
+            $("#import-band").html(opts);
+        }
+        new bootstrap.Modal("#importModal").show();
+    });
+}
+
+function loadImportSongs() {
+    var bandId = parseInt($("#import-band").val(), 10);
+    _importSongs = []; _importBandId = bandId || null;
+    $("#import-confirm").prop("disabled", true);
+    $("#import-alert").hide();
+    if (!bandId) { $("#import-list").html(\'<div class="list-group-item text-muted">Kies eerst een band.</div>\'); return; }
+
+    $("#import-list").html(\'<div class="list-group-item text-muted"><i class="bi bi-hourglass-split"></i> Laden...</div>\');
+    $.get("api/songs.php", {band_id: bandId}, function(data) {
+        var raw = data.songs || [];
+        var decrypt = (window.LGVault && raw.some(function(s){ return s && s.enc_blob; }))
+            ? LGVault.decryptSongs(bandId, raw) : Promise.resolve(raw);
+        decrypt.then(function(songs) {
+            // Een vergrendeld nummer kan niet gekopieerd worden (geen sleutel).
+            var locked = songs.filter(function(s){ return s._locked; }).length;
+            _importSongs = songs.filter(function(s){ return !s._locked; });
+            if (locked) {
+                $("#import-alert").text(locked + " nummer(s) konden niet ontsleuteld worden en zijn overgeslagen (geen toegang tot die kluis).").show();
+            }
+            renderImportSongs();
+        });
+    }).fail(function() {
+        $("#import-list").html(\'<div class="list-group-item text-danger">Laden mislukt.</div>\');
+    });
+}
+
+function renderImportSongs() {
+    var q = ($("#import-filter").val() || "").toLowerCase();
+    var c = $("#import-list"); c.empty();
+    var shown = _importSongs.filter(function(s) {
+        return !q || (s.title||"").toLowerCase().includes(q) || (s.artist||"").toLowerCase().includes(q);
+    });
+    if (!shown.length) { c.append(\'<div class="list-group-item text-muted">Geen nummers.</div>\'); }
+    shown.forEach(function(s) {
+        var idx = _importSongs.indexOf(s);
+        c.append(
+            \'<label class="list-group-item list-group-item-dark d-flex align-items-center gap-2">\'
+            + \'<input type="checkbox" class="form-check-input m-0 import-chk" value="\' + idx + \'" onchange="updateImportCount()">\'
+            + \'<span class="flex-grow-1">\' + escHtml(s.title) + \' <span class="text-muted small">\' + escHtml(s.artist) + \'</span></span>\'
+            + \'<span class="bpm-badge">\' + (s.bpm || "--") + \'</span></label>\'
+        );
+    });
+    updateImportCount();
+}
+
+function importSelectAll(on) {
+    $(".import-chk").prop("checked", on);
+    updateImportCount();
+}
+
+function updateImportCount() {
+    var n = $(".import-chk:checked").length;
+    $("#import-confirm").prop("disabled", n === 0);
+    $("#import-progress").text(n ? n + " geselecteerd" : "");
+}
+
+function doImport() {
+    var idxs = $(".import-chk:checked").map(function(){ return parseInt(this.value, 10); }).get();
+    if (!idxs.length) return;
+    $("#import-confirm").prop("disabled", true);
+
+    if (BAND_ENCRYPTED && window.LGKeys && LGKeys.keyState() !== "unlocked") {
+        alert("Je kluis is niet ontgrendeld. Log opnieuw in met je wachtwoord."); return;
+    }
+
+    var done = 0, fail = 0;
+    idxs.reduce(function(p, idx) {
+        return p.then(function() {
+            var src = _importSongs[idx];
+            // Nieuw nummer-object voor de doelband (zonder id/band-specifieke velden).
+            var copy = {
+                title: src.title, artist: src.artist, bpm: src.bpm, song_key: src.song_key,
+                duration: src.duration, starts: src.starts, description: src.description,
+                lyrics: src.lyrics, chords: src.chords, drum_notation: src.drum_notation,
+                drum_svg: src.drum_svg, preview_url: src.preview_url, spotify_id: src.spotify_id
+            };
+            $("#import-progress").text("Bezig... " + (done + fail + 1) + "/" + idxs.length);
+
+            var send;
+            if (BAND_ENCRYPTED && window.LGVault) {
+                send = LGVault.encryptSongFields(BAND_ID, copy).then(function(blob) {
+                    return $.ajax({ url: "api/songs.php", type: "POST", contentType: "application/json",
+                        data: JSON.stringify({ band_id: BAND_ID, enc_blob: blob }), dataType: "json" });
+                });
+            } else {
+                copy.band_id = BAND_ID;
+                send = $.ajax({ url: "api/songs.php", type: "POST", contentType: "application/json",
+                    data: JSON.stringify(copy), dataType: "json" });
+            }
+            return send.then(function(r){ if (r.ok) done++; else fail++; }, function(){ fail++; });
+        });
+    }, Promise.resolve()).then(function() {
+        $("#import-progress").text("");
+        bootstrap.Modal.getInstance("#importModal").hide();
+        alert(done + " nummer(s) geïmporteerd" + (fail ? ", " + fail + " mislukt" : "") + ".");
+        loadSongsTable();
     });
 }
 

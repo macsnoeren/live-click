@@ -139,8 +139,14 @@ function initSchema(PDO $db): void {
     // E2EE (fase 3): versleutelde blob met alle inhoudsvelden van een nummer.
     // Voor versleutelde bands staan de losse plaintext-kolommen leeg/NULL.
     try { $db->exec('ALTER TABLE songs ADD COLUMN enc_blob TEXT'); } catch (PDOException $e) {}
+    // E2EE (fase 4): versleutelde blob met de naam van een setlijst.
+    try { $db->exec('ALTER TABLE setlists ADD COLUMN enc_blob TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE bands ADD COLUMN share_token TEXT'); } catch (PDOException $e) {}
     try { $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_bands_share_token ON bands(share_token) WHERE share_token IS NOT NULL'); } catch (PDOException $e) {}
+    // E2EE (fase 5): versleutelde projectie voor de publieke deellink. Bevat
+    // alleen de publiek getoonde velden, versleuteld met een aparte deelsleutel
+    // die uitsluitend in de URL-fragment leeft (zie PRIVACY.md §6).
+    try { $db->exec('ALTER TABLE bands ADD COLUMN share_blob TEXT'); } catch (PDOException $e) {}
     // E2EE-sleutelmateriaal per gebruiker (zie PRIVACY.md). Allemaal nullable:
     // een gebruiker krijgt pas sleutels bij de eerste login ná invoering.
     //   kdf_salt             — salt voor PBKDF2 (wachtwoord → KEK)

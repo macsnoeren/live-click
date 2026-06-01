@@ -614,9 +614,49 @@ function revokeInvite(bandId) {
 
 // ---- Setlijst deellink ----
 
-function shareUrl(token) {
+function shareUrl(token, keyB64) {
     var base = window.location.href.replace(/\/[^\/]*(\?.*)?$/, "/");
-    return base + "public.php?t=" + token;
+    var url = base + "public.php?t=" + token;
+    // E2EE: de deelsleutel gaat in de URL-fragment (#k=…) en bereikt de server nooit.
+    if (keyB64) url += "#k=" + encodeURIComponent(keyB64);
+    return url;
+}
+
+// Is deze band versleuteld? (op basis van de geladen bandgegevens)
+function bandIsEnc(bandId) {
+    var b = _allBands.find(function(x){ return x.id == bandId; });
+    return b && b.is_encrypted == 1;
+}
+
+/* Bouwt de publieke projectie van een versleutelde band: alleen de velden die
+   op de deelpagina getoond worden (geen notities/tekst/akkoorden/PDF). Haalt de
+   setlijsten op en ontsleutelt namen + nummers in de browser. */
+function buildShareProjection(bandId) {
+    var b = _allBands.find(function(x){ return x.id == bandId; });
+    var bandName = b ? b.name : "";
+    return $.get("api/setlists.php", {band_id: bandId}).then(function(data) {
+        var lists = data.setlists || [];
+        var namesDone = (window.LGVault && lists.some(function(sl){ return sl.enc_blob; }))
+            ? LGVault.decryptSetlists(bandId, lists) : Promise.resolve(lists);
+        return namesDone.then(function() {
+            return Promise.all(lists.map(function(sl) {
+                var songsDone = (window.LGVault && (sl.songs||[]).some(function(s){ return s.enc_blob; }))
+                    ? LGVault.decryptSongs(bandId, sl.songs || []) : Promise.resolve(sl.songs || []);
+                return songsDone.then(function(songs) {
+                    return {
+                        name: sl.name,
+                        songs: songs.map(function(s) {
+                            return { title: s.title, artist: s.artist, bpm: s.bpm,
+                                     duration: s.duration, starts: s.starts };
+                        })
+                    };
+                });
+            })).then(function(projLists) {
+                projLists.sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", undefined, {sensitivity:"base"}); });
+                return { band: bandName, setlists: projLists };
+            });
+        });
+    });
 }
 
 function toggleShare(bandId) {
@@ -634,10 +674,14 @@ function toggleShare(bandId) {
     }
 }
 
-function renderShareToken(bandId, token) {
-    var url = shareUrl(token);
+function renderShareToken(bandId, token, keyB64) {
+    var url = shareUrl(token, keyB64);
+    var encNote = keyB64
+        ? \'<p class="text-muted small mb-2"><i class="bi bi-shield-lock me-1"></i>Deze link bevat de sleutel (na #) — deel de volledige link. De server kan de inhoud niet lezen.</p>\'
+        : \'\';
     $("#share-" + bandId).html(
-        \'<div class="input-group input-group-sm mb-2">\'
+        encNote
+        + \'<div class="input-group input-group-sm mb-2">\'
         + \'<input type="text" class="form-control form-control-sm" id="share-url-\' + bandId + \'" value="\' + escHtml(url) + \'" readonly onclick="this.select()">\'
         + \'<button class="btn btn-outline-secondary btn-sm" onclick="copyShare(\' + bandId + \')" title="Kopieer"><i class="bi bi-clipboard"></i></button>\'
         + \'</div>\'
@@ -656,9 +700,14 @@ function renderNoShare(bandId) {
 }
 
 // Token bestaat al maar plaintext is niet bekend (alleen bij creatie zichtbaar).
+// Bij een versleutelde band is de deelsleutel sowieso niet herleidbaar — een
+// nieuwe link aanmaken is dan de enige optie.
 function renderShareExists(bandId) {
+    var note = bandIsEnc(bandId)
+        ? "Er bestaat een deellink. De sleutel zat in de eerder getoonde link; maak een nieuwe link als je hem kwijt bent."
+        : "Er bestaat een deellink. De URL wordt om veiligheidsredenen alleen bij aanmaak getoond.";
     $("#share-" + bandId).html(
-        \'<p class="text-muted small mb-2">Er bestaat een deellink. De URL wordt om veiligheidsredenen alleen bij aanmaak getoond.</p>\'
+        \'<p class="text-muted small mb-2">\' + note + \'</p>\'
         + \'<div class="d-flex gap-2">\'
         + \'<button class="btn btn-xs btn-outline-secondary" onclick="regenerateShare(\' + bandId + \')"><i class="bi bi-arrow-repeat me-1"></i>Nieuwe link</button>\'
         + \'<button class="btn btn-xs btn-outline-danger" onclick="revokeShare(\' + bandId + \')"><i class="bi bi-trash me-1"></i>Verwijder</button>\'
@@ -676,6 +725,26 @@ function copyShare(bandId) {
 }
 
 function regenerateShare(bandId) {
+    if (bandIsEnc(bandId)) {
+        // Versleutelde band: projectie bouwen, versleutelen, blob + token aanmaken,
+        // en de deelsleutel in de fragment van de getoonde URL zetten.
+        if (window.LGKeys && LGKeys.keyState() !== "unlocked") {
+            alert("Je kluis is niet ontgrendeld. Log opnieuw in met je wachtwoord."); return;
+        }
+        $("#share-" + bandId).html(\'<div class="text-muted small"><i class="bi bi-hourglass-split"></i> Versleutelen...</div>\');
+        buildShareProjection(bandId).then(function(proj) {
+            return LGShare.encrypt(proj).then(function(enc) {
+                return $.ajax({ url: "api/share.php", type: "POST", contentType: "application/json",
+                    data: JSON.stringify({ band_id: bandId, share_blob: enc.blob }), dataType: "json" })
+                    .then(function(r) {
+                        if (!r.ok) throw new Error(r.error || "Fout");
+                        $("#share-" + bandId).data("loaded", true);
+                        renderShareToken(bandId, r.token, enc.keyB64);
+                    });
+            });
+        }).catch(function(e) { alert(e.message || "Deellink aanmaken mislukt."); renderNoShare(bandId); });
+        return;
+    }
     $.post("api/share.php", JSON.stringify({band_id: bandId}), function(r) {
         if (r.ok) {
             $("#share-" + bandId).data("loaded", true);

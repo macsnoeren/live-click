@@ -11,31 +11,44 @@ if (!$token) { http_response_code(404); die('Ongeldige link.'); }
 
 $db   = getDB();
 // Token in DB is een SHA-256-hash van de plaintext-token in de URL.
-$stmt = $db->prepare('SELECT id, name FROM bands WHERE share_token=?');
+$stmt = $db->prepare('SELECT id, name, is_encrypted, share_blob FROM bands WHERE share_token=?');
 $stmt->execute([hash('sha256', $token)]);
 $band = $stmt->fetch();
 if (!$band) { http_response_code(404); die('Link niet gevonden of verlopen.'); }
 
-// Setlists met nummers ophalen
-$stmt = $db->prepare('SELECT id, name FROM setlists WHERE band_id=? ORDER BY name COLLATE NOCASE ASC');
-$stmt->execute([$band['id']]);
-$setlists = $stmt->fetchAll();
+$encrypted = (int)($band['is_encrypted'] ?? 0) === 1;
 
-foreach ($setlists as &$sl) {
-    $s = $db->prepare(
-        'SELECT s.title, s.artist, s.bpm, s.duration, s.starts
-           FROM setlist_songs ss
-           JOIN songs s ON s.id = ss.song_id
-          WHERE ss.setlist_id = ?
-          ORDER BY ss.position'
-    );
-    $s->execute([$sl['id']]);
-    $sl['songs'] = $s->fetchAll();
+if ($encrypted) {
+    // Versleutelde band: de server heeft GEEN leesbare inhoud. We sturen alleen
+    // de versleutelde projectie mee; de browser ontsleutelt met de sleutel uit
+    // de URL-fragment (#k=...) die de server nooit ontvangt. Zie PRIVACY.md §6.
+    $setlists  = [];
+    $shareBlob = $band['share_blob'] ?: '';
+    $bandName  = 'Beveiligde band';   // echte naam zit in de versleutelde projectie
+    $hasLists  = $shareBlob !== '';
+} else {
+    // Setlists met nummers ophalen (plaintext band — server rendert)
+    $stmt = $db->prepare('SELECT id, name FROM setlists WHERE band_id=? ORDER BY name COLLATE NOCASE ASC');
+    $stmt->execute([$band['id']]);
+    $setlists = $stmt->fetchAll();
+
+    foreach ($setlists as &$sl) {
+        $s = $db->prepare(
+            'SELECT s.title, s.artist, s.bpm, s.duration, s.starts
+               FROM setlist_songs ss
+               JOIN songs s ON s.id = ss.song_id
+              WHERE ss.setlist_id = ?
+              ORDER BY ss.position'
+        );
+        $s->execute([$sl['id']]);
+        $sl['songs'] = $s->fetchAll();
+    }
+    unset($sl);
+
+    $shareBlob = '';
+    $bandName  = htmlspecialchars($band['name']);
+    $hasLists  = !empty($setlists);
 }
-unset($sl);
-
-$bandName = htmlspecialchars($band['name']);
-$hasLists = !empty($setlists);
 ?>
 <!doctype html>
 <html lang="nl">
@@ -158,7 +171,7 @@ $hasLists = !empty($setlists);
 <div class="pub-header">
     <div>
         <div class="pub-brand">LiveGig</div>
-        <div class="pub-band"><?= $bandName ?></div>
+        <div class="pub-band" id="pub-band-name"><?= $bandName ?></div>
     </div>
     <?php if ($hasLists): ?>
     <button class="btn-print no-print" onclick="window.print()">
@@ -166,6 +179,108 @@ $hasLists = !empty($setlists);
     </button>
     <?php endif; ?>
 </div>
+
+<?php if ($encrypted): ?>
+<!-- Versleutelde band: inhoud wordt in de browser ontsleuteld -->
+<div id="enc-status" class="no-setlists">
+    <i class="bi bi-shield-lock" style="font-size:2rem;display:block;margin-bottom:12px"></i>
+    Beveiligde setlijst ontsleutelen…
+</div>
+<div id="enc-content"></div>
+
+<script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="assets/js/crypto.js?v=<?= filemtime(APP_ROOT . '/htdocs/live-click/assets/js/crypto.js') ?>"></script>
+<script>
+(function () {
+    var SHARE_BLOB = <?= json_encode($shareBlob) ?>;
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    function fail(msg) {
+        var el = document.getElementById('enc-status');
+        el.innerHTML = '<i class="bi bi-shield-lock-fill" style="font-size:2rem;display:block;margin-bottom:12px"></i>' + esc(msg);
+    }
+
+    // De deelsleutel staat in de URL-fragment (#k=...) en bereikt de server nooit.
+    var hash = (location.hash || '').replace(/^#/, '');
+    var params = {};
+    hash.split('&').forEach(function (p) {
+        var kv = p.split('='); if (kv[0]) params[kv[0]] = decodeURIComponent(kv[1] || '');
+    });
+    var key = params.k;
+
+    if (!SHARE_BLOB) { fail('Geen gedeelde inhoud beschikbaar.'); return; }
+    if (!key)        { fail('Deze link mist de sleutel (#k=…). Gebruik de volledige link.'); return; }
+    if (!window.LGShare) { fail('Versleuteling niet beschikbaar in deze browser.'); return; }
+
+    LGShare.decrypt(SHARE_BLOB, key).then(function (proj) {
+        document.getElementById('enc-status').style.display = 'none';
+        renderProjection(proj);
+    }).catch(function () {
+        fail('Ontsleutelen mislukt — onjuiste of verouderde link.');
+    });
+
+    function renderProjection(proj) {
+        var setlists = (proj && proj.setlists) || [];
+        if (proj && proj.band) {
+            document.getElementById('pub-band-name').textContent = proj.band;
+            document.title = proj.band + ' — Setlijsten';
+        }
+        var c = document.getElementById('enc-content');
+        if (!setlists.length) {
+            c.innerHTML = '<div class="no-setlists"><i class="bi bi-list-ol" style="font-size:2rem;display:block;margin-bottom:12px"></i>Geen setlijsten beschikbaar.</div>';
+            return;
+        }
+
+        // Selector
+        var html = '<div class="pub-controls no-print">'
+            + '<label style="font-size:.85rem;color:#888" for="sl-select">Setlijst:</label>'
+            + '<select id="sl-select" class="select-dark"><option value="">—</option>';
+        setlists.forEach(function (sl, i) {
+            html += '<option value="' + i + '">' + esc(sl.name) + ' (' + (sl.songs||[]).length + ' nummers)</option>';
+        });
+        html += '</select><span style="font-size:.75rem;color:#444;margin-left:4px">Bij afdrukken worden alle setlijsten geprint.</span></div>';
+
+        // Setlijsten
+        setlists.forEach(function (sl, i) {
+            var songs = sl.songs || [];
+            html += '<div class="pub-setlist" data-idx="' + i + '"' + (i > 0 ? ' style="display:none"' : '') + '>'
+                + '<div class="pub-sl-title">' + esc(sl.name) + ' <span class="pub-sl-meta">' + songs.length + ' nummers</span></div>';
+            if (!songs.length) {
+                html += '<div class="pub-empty">Lege setlijst.</div>';
+            } else {
+                html += '<table class="pub-table"><thead><tr><th>#</th><th>Titel</th><th>Artiest</th><th>BPM</th><th>Duur</th><th>Start</th></tr></thead><tbody>';
+                songs.forEach(function (s, j) {
+                    html += '<tr><td class="num">' + (j+1) + '</td>'
+                        + '<td class="title">' + esc(s.title) + '</td>'
+                        + '<td class="artist">' + esc(s.artist) + '</td>'
+                        + '<td class="bpm">' + (s.bpm ? esc(s.bpm) : '<span style="color:#333">—</span>') + '</td>'
+                        + '<td class="dur">' + (s.duration ? esc(s.duration) : '') + '</td>'
+                        + '<td class="starts">' + esc(s.starts || '') + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            }
+            html += '</div>';
+        });
+        html += '<div class="pub-print-footer">Gegenereerd door LiveGig · ' + esc(proj.band || '') + '</div>';
+        c.innerHTML = html;
+
+        var sel = document.getElementById('sl-select');
+        if (sel) sel.addEventListener('change', function () {
+            var idx = this.value;
+            c.querySelectorAll('.pub-setlist').forEach(function (el) {
+                el.style.display = (idx !== '' && el.getAttribute('data-idx') === idx) ? '' : (idx === '' ? '' : 'none');
+            });
+        });
+    }
+})();
+</script>
+</body>
+</html>
+<?php return; ?>
 
 <?php if (!$hasLists): ?>
 <div class="no-setlists">

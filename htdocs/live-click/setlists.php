@@ -4,6 +4,7 @@ require_once APP_ROOT . '/includes/auth.php';
 requireLogin();
 $user = currentUser();
 $canEdit = userCanEditBandContent((int)($user['band_id'] ?? 0));
+$bandEncrypted = bandIsEncrypted((int)($user['band_id'] ?? 0));
 $pageTitle = 'Setlists — LiveGig';
 require APP_ROOT . '/includes/header.php';
 ?>
@@ -102,6 +103,7 @@ var _deleteSlId = null;
 var _setlistsData = [];
 var _canEdit = ' . ($canEdit ? 'true' : 'false') . ';
 var BAND_ID = ' . ($bandId ?: 'null') . ';
+var BAND_ENCRYPTED = ' . ($bandEncrypted ? 'true' : 'false') . ';
 
 $(function() {
     loadSetlists();
@@ -115,14 +117,52 @@ function lgDecryptList(songs) {
     return Promise.resolve(songs || []);
 }
 
+/* E2EE: ontsleutel de setlijstnamen indien versleuteld (anders no-op). */
+function lgDecryptSetlistNames(lists) {
+    if (window.LGVault && lists && lists.some(function(sl){ return sl && sl.enc_blob; })) {
+        return LGVault.decryptSetlists(BAND_ID, lists);
+    }
+    return Promise.resolve(lists || []);
+}
+
 function loadSetlists() {
     $.get("api/setlists.php", {band_id: BAND_ID}, function(data) {
         _setlistsData = data.setlists || [];
-        var jobs = _setlistsData.map(function(sl) {
-            return lgDecryptList(sl.songs || []).then(function(songs) { sl.songs = songs; });
+        lgDecryptSetlistNames(_setlistsData).then(function() {
+            // Alfabetisch sorteren ná het ontsleutelen van de namen
+            _setlistsData.sort(function(a, b) {
+                return (a.name || "").localeCompare(b.name || "", undefined, {sensitivity:"base"});
+            });
+            var jobs = _setlistsData.map(function(sl) {
+                return lgDecryptList(sl.songs || []).then(function(songs) { sl.songs = songs; });
+            });
+            return Promise.all(jobs);
+        }).then(function() {
+            renderSetlists(_setlistsData);
+            migratePlaintextSetlists(_setlistsData);
         });
-        Promise.all(jobs).then(function() { renderSetlists(_setlistsData); });
     });
+}
+
+// E2EE: bestaande, nog niet-versleutelde setlijsten in een versleutelde band
+// omzetten naar enc_blob (alleen de naam). Idempotent — al-versleutelde worden
+// overgeslagen. Verandert de nummers niet (die migreren via de Nummers-pagina).
+function migratePlaintextSetlists(lists) {
+    if (!BAND_ENCRYPTED || !_canEdit || !window.LGVault) return;
+    if (window.LGKeys && LGKeys.keyState() !== "unlocked") return;
+    var todo = (lists || []).filter(function(sl){ return !sl.enc_blob && sl.name; });
+    if (!todo.length) return;
+    todo.reduce(function(p, sl) {
+        return p.then(function() {
+            return LGVault.encryptSetlistName(BAND_ID, sl.name).then(function(blob) {
+                return $.ajax({ url: "api/setlists.php", type: "POST", contentType: "application/json",
+                    data: JSON.stringify({
+                        id: sl.id, band_id: BAND_ID, enc_blob: blob,
+                        songs: (sl.songs || []).map(function(s){ return s.id; })
+                    }), dataType: "json" });
+            });
+        });
+    }, Promise.resolve()).then(function() { loadSetlists(); }).catch(function() {});
 }
 
 function renderSetlists(lists) {
@@ -180,7 +220,10 @@ function openEditSetlist(id) {
     $.get("api/setlists.php", {id: id}, function(data) {
         var sl = data.setlist;
         if (!sl) return;
-        lgDecryptList(sl.songs || []).then(function(songs) {
+        // Eerst de naam ontsleutelen (versleutelde band), dan de nummers.
+        lgDecryptSetlistNames([sl]).then(function() {
+            return lgDecryptList(sl.songs || []);
+        }).then(function(songs) {
             sl.songs = songs;
             $("#createSetlistTitle").text("Setlist bewerken");
             $("#sl-name").val(sl.name);
@@ -273,15 +316,32 @@ function saveSetlist() {
     var data = {
         id: $("#sl-id").val(),
         name: name,
-        band_id: ' . $bandId . ',
+        band_id: BAND_ID,
         songs: _slSongs.map(function(s){ return s.id; })
     };
-    $.post("api/setlists.php", JSON.stringify(data), function(r) {
-        if (r.ok) {
-            bootstrap.Modal.getInstance("#createSetlistModal").hide();
-            loadSetlists();
-        } else { alert(r.error || "Fout bij opslaan"); }
-    }, "json");
+
+    function send() {
+        $.post("api/setlists.php", JSON.stringify(data), function(r) {
+            if (r.ok) {
+                bootstrap.Modal.getInstance("#createSetlistModal").hide();
+                loadSetlists();
+            } else { alert(r.error || "Fout bij opslaan"); }
+        }, "json");
+    }
+
+    if (BAND_ENCRYPTED && window.LGVault) {
+        // E2EE: naam in enc_blob, plaintext-naam niet meesturen.
+        if (window.LGKeys && LGKeys.keyState() !== "unlocked") {
+            alert("Je kluis is niet ontgrendeld. Log opnieuw in met je wachtwoord."); return;
+        }
+        LGVault.encryptSetlistName(BAND_ID, name).then(function(blob) {
+            delete data.name;
+            data.enc_blob = blob;
+            send();
+        }).catch(function() { alert("Versleutelen mislukt."); });
+    } else {
+        send();
+    }
 }
 
 function openDeleteSetlist(id, idx) {

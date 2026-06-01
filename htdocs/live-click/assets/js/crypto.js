@@ -491,12 +491,77 @@
         }).catch(function () { return songs; });
     }
 
+    /* ── Setlijstnaam ⇄ enc_blob (fase 4) ─────────────────────────────
+     * Alleen de naam zit in de blob; de relatie setlist→nummers blijft
+     * relationeel (zie PRIVACY.md §7). */
+    function encryptSetlistName(bandId, name) {
+        return getBandKey(bandId).then(function (bdk) {
+            if (!bdk) throw new Error('Kluis niet ontgrendeld.');
+            return aesEncryptJSON(bdk, { name: name }).then(function (blob) { return JSON.stringify(blob); });
+        });
+    }
+
+    /** Ontsleutelt (in-place) de namen van setlijsten met een enc_blob. */
+    function decryptSetlists(bandId, lists) {
+        lists = lists || [];
+        var enc = lists.filter(function (sl) { return sl && sl.enc_blob; });
+        if (!enc.length) return Promise.resolve(lists);
+
+        return getBandKey(bandId).then(function (bdk) {
+            if (!bdk) {
+                enc.forEach(function (sl) { sl._locked = true; if (!sl.name) sl.name = '🔒 Vergrendeld'; });
+                return lists;
+            }
+            return Promise.all(enc.map(function (sl) {
+                var blob;
+                try { blob = JSON.parse(sl.enc_blob); } catch (e) { sl._locked = true; return sl; }
+                return aesDecryptJSON(bdk, blob).then(function (f) {
+                    if (f && typeof f.name === 'string') sl.name = f.name;
+                    sl._enc = true; sl._locked = false;
+                    return sl;
+                }).catch(function () {
+                    sl._locked = true; if (!sl.name) sl.name = '🔒 Vergrendeld';
+                    return sl;
+                });
+            })).then(function () { return lists; });
+        }).catch(function () { return lists; });
+    }
+
     global.LGVault = {
         status: vaultStatus,
         enableVault: enableVault,
         getBandKey: getBandKey,
         grantMissing: grantMissing,
         encryptSongFields: encryptSongFields,
-        decryptSongs: decryptSongs
+        decryptSongs: decryptSongs,
+        encryptSetlistName: encryptSetlistName,
+        decryptSetlists: decryptSetlists
     };
+
+    /* =================================================================
+     * LGShare — publieke deellink met deelsleutel-in-fragment (fase 5)
+     *
+     * De deelsleutel (SK) is een losse, willekeurige AES-sleutel — onafhankelijk
+     * van de BDK, zodat de bandsleutel nooit in een URL belandt. De server krijgt
+     * alleen de versleutelde projectie; SK leeft uitsluitend in location.hash.
+     * ================================================================= */
+    /** Versleutel een projectie-object → { blob: string, keyB64: string }. */
+    function shareEncrypt(projection) {
+        return aesGenKey(true).then(function (sk) {
+            return aesEncryptJSON(sk, projection).then(function (blob) {
+                return aesExportRawB64(sk).then(function (keyB64) {
+                    return { blob: JSON.stringify(blob), keyB64: keyB64 };
+                });
+            });
+        });
+    }
+    /** Ontsleutel een projectie met de sleutel uit de fragment. */
+    function shareDecrypt(blobStr, keyB64) {
+        var blob = (typeof blobStr === 'string') ? JSON.parse(blobStr) : blobStr;
+        return aesImportRawB64(keyB64, false).then(function (sk) {
+            return aesDecryptJSON(sk, blob);
+        });
+    }
+
+    global.LGShare = { encrypt: shareEncrypt, decrypt: shareDecrypt };
 })(window);
