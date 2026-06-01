@@ -136,9 +136,15 @@ require APP_ROOT . '/includes/header.php';
 
             <div id="tfa-setup-wrap" style="display:none">
                 <p class="text-muted small mb-2">
-                    <strong>Op je telefoon</strong>: tik op de onderstaande link om je authenticator-app direct te openen,
+                    <strong>Op je computer</strong>: scan de QR-code met je authenticator-app.
+                    <strong>Op je telefoon</strong>: tik op de onderstaande link om je app direct te openen,
                     of voer de sleutel handmatig in.
                 </p>
+
+                <div class="mb-3 text-center">
+                    <div id="tfa-qr" class="d-inline-block p-2 bg-white rounded"
+                         style="line-height:0" aria-label="QR-code voor 2FA"></div>
+                </div>
 
                 <div class="mb-3">
                     <label class="form-label text-muted small">Authenticator-link (tik op je mobiel)</label>
@@ -195,7 +201,9 @@ require APP_ROOT . '/includes/header.php';
 </div>
 
 <?php
-$extraScripts = '<script>
+$qrVer = filemtime(APP_ROOT . '/htdocs/live-click/assets/vendor/qrcode/qrcode.min.js');
+$extraScripts = '<script src="assets/vendor/qrcode/qrcode.min.js?v=' . $qrVer . '"></script>
+<script>
 // ── Herstelcode (kluis) ───────────────────────────────────────────────────
 // Toon de kaart alleen als de gebruiker een sleutelpaar heeft. De genereer-knop
 // werkt alleen als de kluis ontgrendeld is (privésleutel in de sessie).
@@ -291,10 +299,32 @@ function start2fa() {
             $("#tfa-secret-display").val(r.secret);
             $("#tfa-otpauth-link").attr("href", r.otpauth_uri);
             $("#tfa-confirm-code").val("");
+            renderTfaQr(r.otpauth_uri);
             $("#tfa-start-wrap").hide();
             $("#tfa-setup-wrap").show();
         }
     });
+}
+
+// Render de otpauth-URI als QR-code (client-side; de secret verlaat de server
+// niet via een externe dienst). Faalt stil terug op de link/sleutel als de
+// QR-library niet geladen is.
+function renderTfaQr(uri) {
+    var el = document.getElementById("tfa-qr");
+    if (!el) return;
+    el.innerHTML = "";
+    if (typeof qrcode !== "function" || !uri) { el.style.display = "none"; return; }
+    try {
+        var qr = qrcode(0, "M");   // typeNumber 0 = auto, error-correctie M
+        qr.addData(uri);
+        qr.make();
+        el.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 0, scalable: true });
+        var svg = el.querySelector("svg");
+        if (svg) { svg.style.width = "200px"; svg.style.height = "200px"; }
+        el.style.display = "";
+    } catch (e) {
+        el.style.display = "none";   // val terug op handmatige sleutel/link
+    }
 }
 
 function cancel2fa() {

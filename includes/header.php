@@ -136,6 +136,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     <li><a class="dropdown-item" href="profile.php"><i class="bi bi-person-gear me-2"></i>Profiel &amp; beveiliging</a></li>
                     <li><a class="dropdown-item" href="privacy.php"><i class="bi bi-shield-lock me-2"></i>Versleuteling &amp; privacy</a></li>
                     <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="handleiding.php"><i class="bi bi-book me-2"></i>Handleiding</a></li>
                     <li><a class="dropdown-item" href="principes.php"><i class="bi bi-heart me-2"></i>Onze principes</a></li>
                     <li><a class="dropdown-item" href="voorwaarden.php"><i class="bi bi-file-text me-2"></i>Voorwaarden</a></li>
                     <li><hr class="dropdown-divider"></li>
