@@ -93,49 +93,76 @@ if ($method === 'POST') {
         exit;
     }
 
-    if ($action === 'rewrap') {
-        // Vervangt de met het wachtwoord versleutelde privésleutel + salt. Wordt
-        // gebruikt na een succesvolle herstelactie (client heeft de privésleutel
-        // via de herstelcode ontsleuteld en verpakt hem onder het nieuwe wachtwoord).
-        $salt    = trim($data['kdf_salt']    ?? '');
-        $encPriv = trim($data['enc_privkey'] ?? '');
-        if ($salt === '' || $encPriv === '') {
-            echo json_encode(['ok' => false, 'error' => 'Onvolledig sleutelmateriaal.']); exit;
-        }
-        if (strlen($salt) > 8000 || strlen($encPriv) > 8000) {
-            echo json_encode(['ok' => false, 'error' => 'Ongeldig formaat.']); exit;
-        }
-        $cur = $db->prepare('SELECT pubkey FROM users WHERE id = ?');
-        $cur->execute([$userId]);
-        if (empty($cur->fetchColumn())) {
-            echo json_encode(['ok' => false, 'error' => 'Er is nog geen sleutelpaar.']); exit;
-        }
-        $db->prepare('UPDATE users SET kdf_salt = ?, enc_privkey = ? WHERE id = ?')
-           ->execute([$salt, $encPriv, $userId]);
-        auditLog('user.keys_rewrap', 'user', $userId);
-        echo json_encode(['ok' => true]);
-        exit;
-    }
-
     if ($action === 'set_recovery') {
         // Tweede, met een herstelcode versleutelde kopie van de privésleutel
         // (zie PRIVACY.md §8). Vereist dat er al een sleutelpaar bestaat.
-        $rsalt = trim($data['recovery_salt'] ?? '');
-        $renc  = trim($data['enc_privkey_recovery'] ?? '');
-        if ($rsalt === '' || $renc === '') {
+        // code_hash = SHA-256 van de genormaliseerde code; dient als server-side
+        // bewijs in de herstelflow. De code zelf komt nooit binnen.
+        $rsalt    = trim($data['recovery_salt'] ?? '');
+        $renc     = trim($data['enc_privkey_recovery'] ?? '');
+        $codeHash = trim($data['code_hash'] ?? '');
+        if ($rsalt === '' || $renc === '' || $codeHash === '') {
             echo json_encode(['ok' => false, 'error' => 'Onvolledig herstelmateriaal.']); exit;
         }
         if (strlen($rsalt) > 8000 || strlen($renc) > 8000) {
             echo json_encode(['ok' => false, 'error' => 'Ongeldig formaat.']); exit;
         }
+        if (!preg_match('/^[a-f0-9]{64}$/', $codeHash)) {
+            echo json_encode(['ok' => false, 'error' => 'Ongeldige code-hash.']); exit;
+        }
         $cur = $db->prepare('SELECT pubkey FROM users WHERE id = ?');
         $cur->execute([$userId]);
         if (empty($cur->fetchColumn())) {
             echo json_encode(['ok' => false, 'error' => 'Er is nog geen sleutelpaar.']); exit;
         }
-        $db->prepare('UPDATE users SET recovery_salt = ?, enc_privkey_recovery = ? WHERE id = ?')
-           ->execute([$rsalt, $renc, $userId]);
+        $db->prepare('UPDATE users SET recovery_salt = ?, enc_privkey_recovery = ?, recovery_code_hash = ? WHERE id = ?')
+           ->execute([$rsalt, $renc, $codeHash, $userId]);
         auditLog('user.recovery_set', 'user', $userId);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    if ($action === 'recover_complete') {
+        // Eénstaps-herstel: client heeft met de herstelcode de privésleutel
+        // ontsleuteld en opnieuw verpakt onder het NIEUWE wachtwoord. De code_hash
+        // bewijst dat de gebruiker de echte herstelcode heeft → we mogen tegelijk
+        // het login-wachtwoord zetten (zonder het oude wachtwoord te kennen).
+        $salt     = trim($data['kdf_salt']    ?? '');
+        $encPriv  = trim($data['enc_privkey'] ?? '');
+        $codeHash = trim($data['code_hash']   ?? '');
+        $newPw    = (string)($data['new_password'] ?? '');
+
+        if ($salt === '' || $encPriv === '' || $codeHash === '' || $newPw === '') {
+            echo json_encode(['ok' => false, 'error' => 'Onvolledige herstelgegevens.']); exit;
+        }
+        if (strlen($salt) > 8000 || strlen($encPriv) > 8000) {
+            echo json_encode(['ok' => false, 'error' => 'Ongeldig formaat.']); exit;
+        }
+        if (($pwErr = validatePasswordStrength($newPw)) !== null) {
+            echo json_encode(['ok' => false, 'error' => $pwErr]); exit;
+        }
+
+        // Rate-limit: voorkom brute-force op de herstelcode-hash.
+        rateLimitCheck('recover:user:' . $userId, 5, 600);
+        rateLimitCheck('recover:ip:'   . clientIp(), 20, 600);
+
+        $row = $db->prepare('SELECT recovery_code_hash FROM users WHERE id = ?');
+        $row->execute([$userId]);
+        $stored = $row->fetchColumn();
+        if (!$stored) {
+            echo json_encode(['ok' => false, 'error' => 'Geen herstelcode ingesteld voor dit account.']); exit;
+        }
+        if (!hash_equals((string)$stored, $codeHash)) {
+            rateLimitRecord('recover:user:' . $userId);
+            rateLimitRecord('recover:ip:'   . clientIp());
+            echo json_encode(['ok' => false, 'error' => 'Onjuiste herstelcode.']); exit;
+        }
+
+        // Kluis-sleutel (onder nieuw wachtwoord) én login-wachtwoord in één keer.
+        $db->prepare('UPDATE users SET kdf_salt = ?, enc_privkey = ?, password_hash = ?, must_change_password = 0 WHERE id = ?')
+           ->execute([$salt, $encPriv, password_hash($newPw, PASSWORD_DEFAULT), $userId]);
+        unset($_SESSION['must_change_password']);
+        auditLog('user.recover_complete', 'user', $userId);
         echo json_encode(['ok' => true]);
         exit;
     }

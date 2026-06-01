@@ -159,6 +159,10 @@ function initSchema(PDO $db): void {
     try { $db->exec('ALTER TABLE users ADD COLUMN enc_privkey TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN enc_privkey_recovery TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN recovery_salt TEXT'); } catch (PDOException $e) {}
+    // SHA-256-hash van de herstelcode — server-side bewijs voor de herstelflow,
+    // zodat herstel + login-wachtwoord wijzigen in één veilige stap kan. De code
+    // zelf gaat nooit naar de server (zie PRIVACY.md §8).
+    try { $db->exec('ALTER TABLE users ADD COLUMN recovery_code_hash TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_secret TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}

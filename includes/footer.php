@@ -63,13 +63,10 @@ if (function_exists('currentUser')) {
 
                 <!-- Herstel met code -->
                 <div id="lg-recover-box" style="display:none" class="mt-3 pt-3 border-top border-secondary">
-                    <p class="text-muted small">Voer je herstelcode in en kies een nieuw wachtwoord. Hiermee opent je kluis weer.</p>
+                    <p class="text-muted small">Voer je herstelcode in en kies een nieuw wachtwoord. Dit stelt in één keer je nieuwe <strong>login-wachtwoord</strong> in én opent je kluis.</p>
                     <input type="text" id="lg-recover-code" class="form-control mb-2 font-monospace" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX">
                     <input type="password" id="lg-recover-pw" class="form-control mb-2" placeholder="Nieuw wachtwoord (min. 12 tekens)" autocomplete="new-password">
-                    <div class="alert alert-warning py-2 small mb-0">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
-                        Let op: dit ontgrendelt alleen de kluis. Wijzig daarna ook je <strong>login-wachtwoord</strong> via Profiel als dat nog niet gedaan is.
-                    </div>
+                    <input type="password" id="lg-recover-pw2" class="form-control mb-2" placeholder="Nieuw wachtwoord herhalen" autocomplete="new-password">
                 </div>
             </div>
             <div class="modal-footer border-secondary">
@@ -117,7 +114,9 @@ function lgDoUnlock() {
     if (mode === 'recover') {
         var code = document.getElementById('lg-recover-code').value;
         var npw  = document.getElementById('lg-recover-pw').value;
+        var npw2 = document.getElementById('lg-recover-pw2').value;
         if (!code || npw.length < 12) { fail('Vul de herstelcode in en een nieuw wachtwoord van minstens 12 tekens.'); return; }
+        if (npw !== npw2) { fail('De nieuwe wachtwoorden komen niet overeen.'); return; }
         LGKeys.recoverWithCode(code, npw).then(function () {
             location.reload();
         }).catch(function (e) { fail(e.message || 'Herstellen mislukt.'); });

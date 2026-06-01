@@ -38,6 +38,16 @@
     var enc = new TextEncoder();
     var dec = new TextDecoder();
 
+    /* SHA-256 van een string → hex. Gebruikt als server-side bewijs van de
+     * herstelcode (niet voor sleutelafleiding — dat blijft PBKDF2). */
+    function sha256Hex(str) {
+        return subtle.digest('SHA-256', enc.encode(str)).then(function (buf) {
+            var bytes = new Uint8Array(buf), hex = '';
+            for (var i = 0; i < bytes.length; i++) hex += ('0' + bytes[i].toString(16)).slice(-2);
+            return hex;
+        });
+    }
+
     /* ── KEK: wachtwoord → AES-GCM-sleutel via PBKDF2 ─────────────── */
     function deriveKEK(password, saltBytes) {
         return subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey'])
@@ -292,14 +302,19 @@
         var salt = randomBytes(16);
         // Spaties/streepjes negeren bij het afleiden, zodat invoer soepel is.
         var norm = code.replace(/[^A-Za-z0-9]/g, '');
-        return deriveKEK(norm, salt).then(function (kek) {
+        return Promise.all([
+            deriveKEK(norm, salt),
+            sha256Hex(norm)            // server-side bewijs (geen sleutelafleiding)
+        ]).then(function (out) {
+            var kek = out[0], codeHash = out[1];
             return aesEncryptBytes(kek, b64ToBuf(b64)).then(function (encPriv) {
                 return fetch('api/keys.php', {
                     method: 'POST', credentials: 'same-origin', headers: csrfHeaders(),
                     body: JSON.stringify({
                         action: 'set_recovery',
                         recovery_salt: bufToB64(salt),
-                        enc_privkey_recovery: JSON.stringify(encPriv)
+                        enc_privkey_recovery: JSON.stringify(encPriv),
+                        code_hash: codeHash
                     })
                 }).then(function (r) { return r.json(); }).then(function (res) {
                     if (!res.ok) throw new Error(res.error || 'Herstel instellen mislukt');
@@ -338,10 +353,10 @@
     }
 
     /**
-     * Herstel met een herstelcode (zie PRIVACY.md §8). Ontsleutelt de privésleutel
-     * via de recovery-kopie en verpakt die opnieuw onder een nieuw wachtwoord.
-     * LET OP: het login-wachtwoord zelf moet apart gewijzigd worden (api/profile of
-     * admin); deze functie zorgt dat de kluis weer met dat nieuwe wachtwoord opent.
+     * Eénstaps-herstel met een herstelcode (zie PRIVACY.md §8). Ontsleutelt de
+     * privésleutel via de recovery-kopie, verpakt die onder het NIEUWE wachtwoord,
+     * en zet in één server-call zowel de kluis-sleutel als het login-wachtwoord.
+     * De code-hash bewijst serverseitig dat dit de echte herstelcode is.
      * Retourneert true bij succes.
      */
     function recoverWithCode(code, newPassword) {
@@ -361,14 +376,20 @@
                     _privKeyMem = res.key;
                     _ssSet(SS_PRIV, res.pkcs8b64);
                     var nsalt = randomBytes(16);
-                    return deriveKEK(newPassword, nsalt).then(function (kek) {
+                    return Promise.all([
+                        deriveKEK(newPassword, nsalt),
+                        sha256Hex(norm)
+                    ]).then(function (out) {
+                        var kek = out[0], codeHash = out[1];
                         return aesEncryptBytes(kek, b64ToBuf(res.pkcs8b64)).then(function (encPriv) {
                             return fetch('api/keys.php', {
                                 method: 'POST', credentials: 'same-origin', headers: csrfHeaders(),
                                 body: JSON.stringify({
-                                    action: 'rewrap',
+                                    action: 'recover_complete',
                                     kdf_salt: bufToB64(nsalt),
-                                    enc_privkey: JSON.stringify(encPriv)
+                                    enc_privkey: JSON.stringify(encPriv),
+                                    code_hash: codeHash,
+                                    new_password: newPassword
                                 })
                             }).then(function (r) { return r.json(); }).then(function (res2) {
                                 if (!res2.ok) throw new Error(res2.error || 'Opslaan mislukt.');

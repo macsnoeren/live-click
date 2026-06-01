@@ -343,9 +343,10 @@ Alle zeven fasen zijn geïmplementeerd:
 - **Admin-wachtwoordreset** zet een nieuw login-wachtwoord maar opent de kluis
   niet; de gebruiker gebruikt daarna zijn **herstelcode** (ontgrendel-prompt) om
   de kluis weer met het nieuwe wachtwoord te koppelen.
-- **Login-wachtwoord na herstel**: `recoverWithCode` koppelt de kluis aan een
-  nieuw wachtwoord, maar wijzigt het login-wachtwoord zelf niet — dat blijft een
-  losse stap via Profiel.
+- **Login-wachtwoord na herstel**: `recoverWithCode` zet in één stap zowel het
+  nieuwe login-wachtwoord als de kluis-sleutel (server-actie `recover_complete`,
+  geverifieerd via de SHA-256-hash van de herstelcode in `users.recovery_code_hash`).
+  Geen losse stap via Profiel meer nodig.
 - De drumstructuur passeert de server in klare tekst op het moment van renderen
   (bewuste, gedocumenteerde compromis — §5.4).
 ```
