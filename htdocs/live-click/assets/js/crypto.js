@@ -309,6 +309,77 @@
         });
     }
 
+    /**
+     * Ontgrendelt de kluis met een (opnieuw ingevoerd) wachtwoord, zonder dat het
+     * in sessionStorage stond. Gebruikt door de ontgrendel-prompt na remember-me
+     * auto-login. Retourneert 'unlocked' | 'locked' | 'no_keys' | 'unsupported'.
+     */
+    function unlock(password) {
+        if (!subtle) return Promise.resolve('unsupported');
+        return fetch('api/keys.php', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (st) {
+                if (!st.ok) return 'locked';
+                if (!st.has_keys) {
+                    // Nog geen sleutelpaar → met dit wachtwoord aanmaken.
+                    return _createKeys(password).then(function () { return 'unlocked'; });
+                }
+                var salt = new Uint8Array(b64ToBuf(st.kdf_salt));
+                return deriveKEK(password, salt)
+                    .then(function (kek) { return unwrapPrivkey(JSON.parse(st.enc_privkey), kek); })
+                    .then(function (res) {
+                        _privKeyMem = res.key;
+                        _ssSet(SS_PRIV, res.pkcs8b64);
+                        return 'unlocked';
+                    })
+                    .catch(function () { return 'locked'; });
+            })
+            .catch(function () { return 'locked'; });
+    }
+
+    /**
+     * Herstel met een herstelcode (zie PRIVACY.md §8). Ontsleutelt de privésleutel
+     * via de recovery-kopie en verpakt die opnieuw onder een nieuw wachtwoord.
+     * LET OP: het login-wachtwoord zelf moet apart gewijzigd worden (api/profile of
+     * admin); deze functie zorgt dat de kluis weer met dat nieuwe wachtwoord opent.
+     * Retourneert true bij succes.
+     */
+    function recoverWithCode(code, newPassword) {
+        var norm = (code || '').replace(/[^A-Za-z0-9]/g, '');
+        if (!norm) return Promise.reject(new Error('Vul een herstelcode in.'));
+        return fetch('api/keys.php', {
+            method: 'POST', credentials: 'same-origin', headers: csrfHeaders(),
+            body: JSON.stringify({ action: 'get_recovery' })
+        }).then(function (r) { return r.json(); }).then(function (st) {
+            if (!st.ok) throw new Error(st.error || 'Geen herstelmateriaal.');
+            var rsalt = new Uint8Array(b64ToBuf(st.recovery_salt));
+            return deriveKEK(norm, rsalt)
+                .then(function (rkek) { return unwrapPrivkey(JSON.parse(st.enc_privkey_recovery), rkek); })
+                .catch(function () { throw new Error('Onjuiste herstelcode.'); })
+                .then(function (res) {
+                    // Privésleutel terug — cache hem en verpak onder het nieuwe wachtwoord.
+                    _privKeyMem = res.key;
+                    _ssSet(SS_PRIV, res.pkcs8b64);
+                    var nsalt = randomBytes(16);
+                    return deriveKEK(newPassword, nsalt).then(function (kek) {
+                        return aesEncryptBytes(kek, b64ToBuf(res.pkcs8b64)).then(function (encPriv) {
+                            return fetch('api/keys.php', {
+                                method: 'POST', credentials: 'same-origin', headers: csrfHeaders(),
+                                body: JSON.stringify({
+                                    action: 'rewrap',
+                                    kdf_salt: bufToB64(nsalt),
+                                    enc_privkey: JSON.stringify(encPriv)
+                                })
+                            }).then(function (r) { return r.json(); }).then(function (res2) {
+                                if (!res2.ok) throw new Error(res2.error || 'Opslaan mislukt.');
+                                return true;
+                            });
+                        });
+                    });
+                });
+        });
+    }
+
     global.LGKeys = {
         SS_PW: SS_PW,
         bootstrap: bootstrap,
@@ -316,6 +387,8 @@
         getPrivateKey: getPrivateKey,
         rewrapForNewPassword: rewrapForNewPassword,
         setupRecovery: setupRecovery,
+        unlock: unlock,
+        recoverWithCode: recoverWithCode,
         lock: lock
     };
 

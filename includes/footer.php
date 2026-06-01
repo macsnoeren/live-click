@@ -26,8 +26,111 @@
      privésleutel zodra die nodig is; faalt stil als versleuteling (nog) niet
      in gebruik is. -->
 <script src="assets/js/crypto.js?v=<?= filemtime(APP_ROOT . '/htdocs/live-click/assets/js/crypto.js') ?>"></script>
+<?php
+// E2EE: is de huidige gebruiker lid van minstens één versleutelde band? Zo ja,
+// en is de kluis vergrendeld (bv. na remember-me auto-login), dan tonen we een
+// ontgrendel-prompt. We bepalen dit serverside om de prompt alleen relevant te tonen.
+$lgInEncryptedBand = false;
+if (function_exists('currentUser')) {
+    $lgU = currentUser();
+    if ($lgU) {
+        try {
+            $lgStmt = getDB()->prepare(
+                'SELECT 1 FROM band_members bm JOIN bands b ON b.id = bm.band_id
+                  WHERE bm.user_id = ? AND b.is_encrypted = 1 LIMIT 1'
+            );
+            $lgStmt->execute([(int)$lgU['id']]);
+            $lgInEncryptedBand = (bool)$lgStmt->fetchColumn();
+        } catch (Exception $e) { /* kolom bestaat nog niet → geen prompt */ }
+    }
+}
+?>
+<?php if ($lgInEncryptedBand): ?>
+<!-- E2EE: ontgrendel-prompt (verschijnt alleen als de kluis op slot zit) -->
+<div class="modal fade" id="lgUnlockModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-shield-lock"></i> Kluis ontgrendelen</h5>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Je bent lid van een versleutelde band. Voer je wachtwoord in om de inhoud te ontgrendelen op dit apparaat.</p>
+                <div id="lg-unlock-alert" class="alert alert-danger py-2 small" style="display:none"></div>
+                <input type="password" id="lg-unlock-pw" class="form-control mb-2" placeholder="Wachtwoord" autocomplete="current-password">
+                <div class="text-end">
+                    <a href="#" class="small text-muted" onclick="lgShowRecover();return false;">Wachtwoord vergeten? Herstelcode gebruiken</a>
+                </div>
+
+                <!-- Herstel met code -->
+                <div id="lg-recover-box" style="display:none" class="mt-3 pt-3 border-top border-secondary">
+                    <p class="text-muted small">Voer je herstelcode in en kies een nieuw wachtwoord. Hiermee opent je kluis weer.</p>
+                    <input type="text" id="lg-recover-code" class="form-control mb-2 font-monospace" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX">
+                    <input type="password" id="lg-recover-pw" class="form-control mb-2" placeholder="Nieuw wachtwoord (min. 12 tekens)" autocomplete="new-password">
+                    <div class="alert alert-warning py-2 small mb-0">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Let op: dit ontgrendelt alleen de kluis. Wijzig daarna ook je <strong>login-wachtwoord</strong> via Profiel als dat nog niet gedaan is.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Later</button>
+                <button type="button" class="btn btn-danger" id="lg-unlock-btn" onclick="lgDoUnlock()">
+                    <i class="bi bi-unlock"></i> Ontgrendelen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <script>
-if (window.LGKeys) { LGKeys.bootstrap().catch(function () {}); }
+(function () {
+    var inEncBand = <?= $lgInEncryptedBand ? 'true' : 'false' ?>;
+    if (!window.LGKeys) return;
+
+    LGKeys.bootstrap().then(function (state) {
+        if (!inEncBand) return;
+        if (state === 'unlocked') return;
+        if (state === 'unsupported') return; // geen WebCrypto → niets te ontgrendelen
+        // Kluis zit op slot terwijl er versleutelde bands zijn → prompt tonen.
+        if (window.bootstrap && document.getElementById('lgUnlockModal')) {
+            try { new bootstrap.Modal('#lgUnlockModal').show(); } catch (e) {}
+        }
+    }).catch(function () {});
+})();
+
+function lgShowRecover() {
+    document.getElementById('lg-recover-box').style.display = '';
+    var btn = document.getElementById('lg-unlock-btn');
+    btn.innerHTML = '<i class="bi bi-key"></i> Herstellen';
+    btn.setAttribute('data-mode', 'recover');
+}
+
+function lgDoUnlock() {
+    var alertEl = document.getElementById('lg-unlock-alert');
+    var btn = document.getElementById('lg-unlock-btn');
+    var mode = btn.getAttribute('data-mode') || 'unlock';
+    alertEl.style.display = 'none';
+    btn.disabled = true;
+
+    function fail(msg) { alertEl.textContent = msg; alertEl.style.display = ''; btn.disabled = false; }
+
+    if (mode === 'recover') {
+        var code = document.getElementById('lg-recover-code').value;
+        var npw  = document.getElementById('lg-recover-pw').value;
+        if (!code || npw.length < 12) { fail('Vul de herstelcode in en een nieuw wachtwoord van minstens 12 tekens.'); return; }
+        LGKeys.recoverWithCode(code, npw).then(function () {
+            location.reload();
+        }).catch(function (e) { fail(e.message || 'Herstellen mislukt.'); });
+        return;
+    }
+
+    var pw = document.getElementById('lg-unlock-pw').value;
+    if (!pw) { fail('Voer je wachtwoord in.'); return; }
+    LGKeys.unlock(pw).then(function (state) {
+        if (state === 'unlocked') { location.reload(); }
+        else { fail('Onjuist wachtwoord, of de kluis kon niet worden geopend.'); }
+    }).catch(function () { fail('Ontgrendelen mislukt.'); });
+}
 </script>
 <?= $extraScripts ?? '' ?>
 <script>

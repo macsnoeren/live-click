@@ -74,6 +74,49 @@ if ($method === 'POST') {
         exit;
     }
 
+    if ($action === 'get_recovery') {
+        // Levert het herstelmateriaal: salt + met de herstelcode versleutelde
+        // privésleutel. Nutteloos zonder de herstelcode (die de server niet kent).
+        // Gebruikt door de herstelflow nadat de gebruiker is ingelogd maar de
+        // kluis niet met het wachtwoord te openen was (bv. na admin-reset).
+        $row = $db->prepare('SELECT recovery_salt, enc_privkey_recovery FROM users WHERE id = ?');
+        $row->execute([$userId]);
+        $r = $row->fetch() ?: [];
+        if (empty($r['enc_privkey_recovery'])) {
+            echo json_encode(['ok' => false, 'error' => 'Geen herstelcode ingesteld voor dit account.']); exit;
+        }
+        echo json_encode([
+            'ok'                   => true,
+            'recovery_salt'        => $r['recovery_salt'],
+            'enc_privkey_recovery' => $r['enc_privkey_recovery'],
+        ]);
+        exit;
+    }
+
+    if ($action === 'rewrap') {
+        // Vervangt de met het wachtwoord versleutelde privésleutel + salt. Wordt
+        // gebruikt na een succesvolle herstelactie (client heeft de privésleutel
+        // via de herstelcode ontsleuteld en verpakt hem onder het nieuwe wachtwoord).
+        $salt    = trim($data['kdf_salt']    ?? '');
+        $encPriv = trim($data['enc_privkey'] ?? '');
+        if ($salt === '' || $encPriv === '') {
+            echo json_encode(['ok' => false, 'error' => 'Onvolledig sleutelmateriaal.']); exit;
+        }
+        if (strlen($salt) > 8000 || strlen($encPriv) > 8000) {
+            echo json_encode(['ok' => false, 'error' => 'Ongeldig formaat.']); exit;
+        }
+        $cur = $db->prepare('SELECT pubkey FROM users WHERE id = ?');
+        $cur->execute([$userId]);
+        if (empty($cur->fetchColumn())) {
+            echo json_encode(['ok' => false, 'error' => 'Er is nog geen sleutelpaar.']); exit;
+        }
+        $db->prepare('UPDATE users SET kdf_salt = ?, enc_privkey = ? WHERE id = ?')
+           ->execute([$salt, $encPriv, $userId]);
+        auditLog('user.keys_rewrap', 'user', $userId);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
     if ($action === 'set_recovery') {
         // Tweede, met een herstelcode versleutelde kopie van de privésleutel
         // (zie PRIVACY.md §8). Vereist dat er al een sleutelpaar bestaat.

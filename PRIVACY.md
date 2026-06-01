@@ -311,4 +311,41 @@ Dit onderscheid wordt expliciet in de UI gemaakt.
    BDK-rotatie; remember-me ontgrendel-prompt; randgevallen en foutmeldingen.
 
 Elke fase is afzonderlijk testbaar en laat niet-versleutelde bands ongemoeid.
+
+---
+
+## 11. Implementatiestatus
+
+Alle zeven fasen zijn geïmplementeerd:
+
+1. **Fundament** ✅ — sleutelpaar per gebruiker (`api/keys.php`, `crypto.js`),
+   KEK uit wachtwoord, privésleutel in `sessionStorage`, herverpakken bij
+   wachtwoordwijziging.
+2. **Kluis per band** ✅ — `bands.is_encrypted`, `band_member_keys`, BDK,
+   herstelcodes, automatische sleuteltoekenning aan (nieuwe) leden (`api/vault.php`,
+   `LGVault`). Statusindicator per lid op de bandpagina.
+3. **Nummers** ✅ — `songs.enc_blob`, drum-SVG bij opslaan in de blob,
+   automatische migratie van bestaande nummers.
+4. **Setlijsten** ✅ — `setlists.enc_blob` (naam), automatische migratie.
+5. **Delen** ✅ — `bands.share_blob` + deelsleutel-in-fragment (`LGShare`,
+   `public.php` client-side ontsleutelen).
+6. **Importeren tussen bands** ✅ — client-side her-versleutelen op de
+   Nummers-pagina; server dwingt lid/leider-rechten op beide bands af.
+7. **Afronden** ✅ — ontgrendel-prompt na remember-me auto-login en
+   herstel-login met herstelcode (`LGKeys.unlock`, `LGKeys.recoverWithCode`,
+   `api/keys.php` acties `get_recovery`/`rewrap`), sleutels wissen bij logout.
+
+### Bekende beperkingen / nog open
+- **BDK-rotatie** bij het intrekken van een lid is voorbereid in het schema
+  (`key_version`) maar nog niet als actieve flow geïmplementeerd; een verwijderd
+  lid verliest wel direct toegang (zijn `band_member_keys`-rij), maar de BDK zelf
+  wordt niet automatisch ververst.
+- **Admin-wachtwoordreset** zet een nieuw login-wachtwoord maar opent de kluis
+  niet; de gebruiker gebruikt daarna zijn **herstelcode** (ontgrendel-prompt) om
+  de kluis weer met het nieuwe wachtwoord te koppelen.
+- **Login-wachtwoord na herstel**: `recoverWithCode` koppelt de kluis aan een
+  nieuw wachtwoord, maar wijzigt het login-wachtwoord zelf niet — dat blijft een
+  losse stap via Profiel.
+- De drumstructuur passeert de server in klare tekst op het moment van renderen
+  (bewuste, gedocumenteerde compromis — §5.4).
 ```
