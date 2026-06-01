@@ -108,8 +108,8 @@ $ingelogd = (bool) currentUser();
     <p>
         LiveGig is een zelf-gehoste applicatie. De verwerkingsverantwoordelijke is de beheerder
         van de installatie waarop jij een account hebt. Voor de installatie op
-        <strong>app.blastcoverband.nl</strong> is dat te bereiken via
-        <a href="mailto:macsnoeren@gmail.com" class="link-light">macsnoeren@gmail.com</a>.
+        <strong>app.blastcoverband.nl</strong> is dat <strong>JMNL Innovation</strong>, te
+        bereiken via <a href="mailto:macsnoeren@gmail.com" class="link-light">macsnoeren@gmail.com</a>.
     </p>
     <p>
         Heb je een account op een andere installatie, dan is de beheerder daarvan verantwoordelijk.
@@ -213,7 +213,7 @@ $ingelogd = (bool) currentUser();
                 <tr><td>Account- en inhoudsgegevens</td><td>Tot je het account (laat) verwijderen.</td></tr>
                 <tr><td>Inlogpogingen (rate-limiting)</td><td>Automatisch opgeruimd na uiterlijk 1 uur.</td></tr>
                 <tr><td>&ldquo;Onthoud mij&rdquo;-tokens</td><td>Tot de vervaldatum of bij uitloggen; bij elk gebruik geroteerd.</td></tr>
-                <tr><td>Audit-logboek</td><td>Bewaard voor beveiliging en verantwoording; de beheerder bepaalt de termijn.</td></tr>
+                <tr><td>Audit-logboek</td><td>Maximaal 12 maanden bewaard voor beveiliging en verantwoording, daarna verwijderd.</td></tr>
             </tbody>
         </table>
     </div>

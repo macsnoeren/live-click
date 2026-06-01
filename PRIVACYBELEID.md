@@ -19,6 +19,7 @@ LiveGig is een zelf-gehoste applicatie. De **verwerkingsverantwoordelijke** is d
 beheerder van de installatie waarop jij een account hebt. Voor de installatie op
 `app.blastcoverband.nl` is dat:
 
+- **Bedrijf:** JMNL Innovation
 - **Contact:** macsnoeren@gmail.com
 
 Heb je een account op een andere installatie, dan is de beheerder daarvan
@@ -113,7 +114,7 @@ geen accountgegevens. Gebruik je de zoekfunctie niet, dan wordt er niets gedeeld
 | Account- en inhoudsgegevens | Tot je het account (laat) verwijderen. |
 | Inlogpogingen (rate-limiting) | Automatisch opgeruimd na uiterlijk 1 uur. |
 | "Onthoud mij"-tokens | Tot de vervaldatum of bij uitloggen; bij elk gebruik geroteerd. |
-| Audit-logboek | Bewaard ten behoeve van beveiliging en verantwoording; de beheerder bepaalt de termijn. |
+| Audit-logboek | Maximaal 12 maanden bewaard ten behoeve van beveiliging en verantwoording, daarna verwijderd. |
 
 ---
 
