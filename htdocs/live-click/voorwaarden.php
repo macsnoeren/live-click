@@ -77,6 +77,7 @@ $ingelogd = (bool) currentUser();
         <span class="brand-name">LiveGig</span>
     </a>
     <nav>
+        <a href="handleiding.php">Handleiding</a>
         <a href="principes.php">Principes</a>
         <a href="voorwaarden.php">Voorwaarden</a>
         <?php if ($ingelogd): ?><a href="dashboard.php">Dashboard</a><?php else: ?><a href="login.php">Inloggen</a><?php endif; ?>
@@ -226,6 +227,7 @@ $ingelogd = (bool) currentUser();
 <footer class="site-footer">
     <div class="mb-2">
         <a href="index.php">Home</a>
+        <a href="handleiding.php">Handleiding</a>
         <a href="principes.php">Principes</a>
         <a href="voorwaarden.php">Voorwaarden</a>
         <a href="privacy.php">Privacy</a>
