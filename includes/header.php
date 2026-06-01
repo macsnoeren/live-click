@@ -139,6 +139,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     <li><a class="dropdown-item" href="handleiding.php"><i class="bi bi-book me-2"></i>Handleiding</a></li>
                     <li><a class="dropdown-item" href="principes.php"><i class="bi bi-heart me-2"></i>Onze principes</a></li>
                     <li><a class="dropdown-item" href="voorwaarden.php"><i class="bi bi-file-text me-2"></i>Voorwaarden</a></li>
+                    <li><a class="dropdown-item" href="privacybeleid.php"><i class="bi bi-shield-check me-2"></i>Privacybeleid</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
                         <form method="POST" action="logout.php" class="m-0"

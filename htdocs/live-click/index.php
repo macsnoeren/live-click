@@ -248,7 +248,7 @@ if (currentUser()) { header('Location: dashboard.php'); exit; }
         <a href="handleiding.php">Handleiding</a>
         <a href="principes.php">Principes</a>
         <a href="voorwaarden.php">Voorwaarden</a>
-        <a href="privacy.php">Privacy</a>
+        <a href="privacybeleid.php">Privacybeleid</a>
         <a href="login.php">Inloggen</a>
         <a href="register.php">Registreren</a>
     </div>

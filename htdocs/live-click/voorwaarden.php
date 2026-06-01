@@ -230,7 +230,7 @@ $ingelogd = (bool) currentUser();
         <a href="handleiding.php">Handleiding</a>
         <a href="principes.php">Principes</a>
         <a href="voorwaarden.php">Voorwaarden</a>
-        <a href="privacy.php">Privacy</a>
+        <a href="privacybeleid.php">Privacybeleid</a>
     </div>
     LiveGig &mdash; gebouwd voor muzikanten.
 </footer>
