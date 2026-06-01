@@ -108,7 +108,7 @@ $ingelogd = (bool) currentUser();
 
 <!-- ── Topbalk ─────────────────────────────────────────────────── -->
 <header class="site-top">
-    <a href="<?= $ingelogd ? 'dashboard.php' : 'landing.php' ?>" class="brand-link">
+    <a href="<?= $ingelogd ? 'dashboard.php' : 'index.php' ?>" class="brand-link">
         <span class="mini-dots"><i class="lit"></i><i></i><i></i><i class="lit"></i></span>
         <span class="brand-name">LiveGig</span>
     </a>
@@ -270,7 +270,7 @@ $ingelogd = (bool) currentUser();
 
 <footer class="site-footer">
     <div class="mb-2">
-        <a href="landing.php">Home</a>
+        <a href="index.php">Home</a>
         <a href="principes.php">Principes</a>
         <a href="voorwaarden.php">Voorwaarden</a>
         <a href="privacy.php">Privacy</a>
