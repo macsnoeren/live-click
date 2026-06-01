@@ -280,7 +280,7 @@ if ($encrypted) {
 </script>
 </body>
 </html>
-<?php return; ?>
+<?php else: /* niet-versleutelde band: server rendert de inhoud */ ?>
 
 <?php if (!$hasLists): ?>
 <div class="no-setlists">
@@ -362,3 +362,4 @@ function showSetlist(id) {
 <?php endif; ?>
 </body>
 </html>
+<?php endif; /* $encrypted */ ?>
