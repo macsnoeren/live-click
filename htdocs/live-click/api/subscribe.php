@@ -44,12 +44,18 @@ if ($method === 'GET' && ($_GET['debug'] ?? '') === 'config') {
    webhookUrl, en geeft de EXACTE verzonden body + Mollie's rauwe antwoord terug.
    Zo zien we precies wat Mollie afkeurt. Verwijder dit blok na de diagnose. */
 if ($method === 'GET' && ($_GET['debug'] ?? '') === 'testpay') {
+    // Optioneel: ?url=… om een andere redirectUrl te testen (bv. een bekend-goede
+    // externe https-URL). Zonder webhookUrl als ?nowebhook=1 wordt meegegeven,
+    // om te isoleren of het probleem bij de redirect of de webhook zit.
+    $override = trim((string)($_GET['url'] ?? ''));
     $body = [
         'amount'      => ['currency' => 'EUR', 'value' => '0.01'],
         'description' => 'LiveGig testpay',
-        'redirectUrl' => defined('MOLLIE_REDIRECT_URL') ? MOLLIE_REDIRECT_URL : '',
-        'webhookUrl'  => defined('MOLLIE_WEBHOOK_URL') ? MOLLIE_WEBHOOK_URL : '',
+        'redirectUrl' => $override !== '' ? $override : (defined('MOLLIE_REDIRECT_URL') ? MOLLIE_REDIRECT_URL : ''),
     ];
+    if (($_GET['nowebhook'] ?? '') !== '1') {
+        $body['webhookUrl'] = defined('MOLLIE_WEBHOOK_URL') ? MOLLIE_WEBHOOK_URL : '';
+    }
     $json = json_encode($body, JSON_UNESCAPED_SLASHES);
     $ch = curl_init('https://api.mollie.com/v2/payments');
     curl_setopt_array($ch, [
