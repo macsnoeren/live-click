@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/totp.php';
+require_once __DIR__ . '/mollie.php';   // facturatie-helpers (bandIsBlocked e.d.)
 
 define('REMEMBER_COOKIE', 'lg_remember');
 define('REMEMBER_DAYS',   30);
@@ -508,6 +509,24 @@ function requireBandAccess(int $bandId): void {
         echo json_encode(['ok' => false, 'error' => 'Geen toegang tot deze band.']);
         exit;
     }
+    requireBandNotBlocked($bandId);
+}
+
+/**
+ * 403 als de band geblokkeerd is (leiderloos of leider zonder actief abonnement).
+ * Geldt voor iedereen — ook leden/kijkers — conform "volledig geblokkeerd".
+ * Zonder Mollie-config blokkeert dit nooit (zie bandIsBlocked()).
+ */
+function requireBandNotBlocked(int $bandId): void {
+    if (bandIsBlocked($bandId)) {
+        http_response_code(403);
+        echo json_encode([
+            'ok' => false,
+            'blocked' => true,
+            'error' => 'Deze band is geblokkeerd: er is geen bandleider met een actief abonnement.',
+        ]);
+        exit;
+    }
 }
 
 // ── Band-rollen ──────────────────────────────────────────────────────────────
@@ -551,6 +570,7 @@ function requireBandContentAccess(int $bandId): void {
         echo json_encode(['ok' => false, 'error' => 'Je hebt alleen leesrechten voor deze band.']);
         exit;
     }
+    requireBandNotBlocked($bandId);
 }
 
 /** 403 als de user geen leider (of admin) van $bandId is. */

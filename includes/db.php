@@ -228,6 +228,10 @@ function initSchema(PDO $db): void {
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
 
+    // Facturatie: is de eenmalige gratis proefmaand al verbruikt door deze
+    // gebruiker? Voorkomt een nieuwe proef bij een latere leiderschapsovername.
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN trial_used INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
+
     // E2EE-kluis per band (zie PRIVACY.md, fase 2).
     //   is_encrypted — staat de kluis aan voor deze band?
     //   key_version  — volgnummer van de Band Data Key (voor rotatie)

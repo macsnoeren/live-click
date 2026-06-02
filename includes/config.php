@@ -44,6 +44,25 @@ if (!defined('MOLLIE_REDIRECT_URL')) {
 if (!defined('MOLLIE_WEBHOOK_URL')) {
     define('MOLLIE_WEBHOOK_URL', getenv('LIVEGIG_MOLLIE_WEBHOOK_URL') ?: '');
 }
+// Abonnementsvoorwaarden. Bedragen als string met punt-decimaal (Mollie-formaat).
+if (!defined('MOLLIE_SUBSCRIPTION_AMOUNT')) {
+    define('MOLLIE_SUBSCRIPTION_AMOUNT', getenv('LIVEGIG_MOLLIE_SUBSCRIPTION_AMOUNT') ?: '2.50');
+}
+if (!defined('MOLLIE_SUBSCRIPTION_INTERVAL')) {
+    define('MOLLIE_SUBSCRIPTION_INTERVAL', getenv('LIVEGIG_MOLLIE_SUBSCRIPTION_INTERVAL') ?: '1 month');
+}
+if (!defined('MOLLIE_SUBSCRIPTION_DESCRIPTION')) {
+    define('MOLLIE_SUBSCRIPTION_DESCRIPTION', getenv('LIVEGIG_MOLLIE_SUBSCRIPTION_DESCRIPTION') ?: 'LiveGig abonnement');
+}
+// Gratis proefperiode (dagen) voordat de eerste echte incasso valt.
+if (!defined('MOLLIE_TRIAL_DAYS')) {
+    define('MOLLIE_TRIAL_DAYS', (int)(getenv('LIVEGIG_MOLLIE_TRIAL_DAYS') ?: 30));
+}
+// Bedrag van de eenmalige "first payment" die alleen het incassomandaat vestigt.
+// iDEAL staat geen €0,00 toe; een minimaal bedrag volstaat om de machtiging te krijgen.
+if (!defined('MOLLIE_MANDATE_AMOUNT')) {
+    define('MOLLIE_MANDATE_AMOUNT', getenv('LIVEGIG_MOLLIE_MANDATE_AMOUNT') ?: '0.01');
+}
 
 // Token cache: Spotify access token op disk (verlopen na 1 uur)
 if (!defined('SPOTIFY_TOKEN_CACHE_FILE')) {
