@@ -29,6 +29,12 @@ if ($method === 'GET' && ($_GET['debug'] ?? '') === 'config') {
         'api_key_prefix'    => $key !== '' ? substr($key, 0, 5) . '…' : '(leeg)',
         'redirect_url'      => defined('MOLLIE_REDIRECT_URL') ? MOLLIE_REDIRECT_URL : '(niet gedefinieerd)',
         'webhook_url'       => defined('MOLLIE_WEBHOOK_URL') ? MOLLIE_WEBHOOK_URL : '(niet gedefinieerd)',
+        // Verborgen tekens (spatie/CR/BOM) worden hier zichtbaar als %XX, en de
+        // lengte verraadt onverwachte extra bytes.
+        'redirect_url_raw'  => defined('MOLLIE_REDIRECT_URL') ? rawurlencode(MOLLIE_REDIRECT_URL) : '',
+        'redirect_url_len'  => defined('MOLLIE_REDIRECT_URL') ? strlen(MOLLIE_REDIRECT_URL) : 0,
+        'webhook_url_raw'   => defined('MOLLIE_WEBHOOK_URL') ? rawurlencode(MOLLIE_WEBHOOK_URL) : '',
+        'webhook_url_len'   => defined('MOLLIE_WEBHOOK_URL') ? strlen(MOLLIE_WEBHOOK_URL) : 0,
     ], JSON_UNESCAPED_SLASHES);
     exit;
 }
