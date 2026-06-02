@@ -53,9 +53,27 @@ require APP_ROOT . '/includes/header.php';
         <div class="card-header"><i class="bi bi-shield-lock-fill me-2"></i>Herstelcode versleuteling</div>
         <div class="card-body">
             <div id="rec-alert" class="alert py-2 mb-3" style="display:none"></div>
+            <p class="text-muted small mb-2">
+                De nummers, setlijsten en notities van een versleutelde band worden zo opgeslagen
+                dat <strong>alleen de bandleden ze kunnen lezen</strong> — niet de beheerder en niet
+                wie de server beheert. Je opent die inhoud met je wachtwoord.
+            </p>
+            <p class="text-muted small mb-2">
+                <strong>Waarom een herstelcode?</strong> Vergeet je je wachtwoord, dan kan
+                <strong>niemand</strong> dat voor je terugzetten — anders zou diegene ook bij de
+                inhoud kunnen, en dat is precies wat we voorkomen. Een beheerder kan je een nieuw
+                inlogwachtwoord geven, maar daarmee gaat de versleutelde inhoud nog niet open.
+                De herstelcode is je eigen reservesleutel om er tóch weer bij te komen.
+            </p>
+            <p class="text-muted small mb-2">
+                Het gaat hier om <strong>twee dingen tegelijk</strong>: jouw eigen toegang, én de
+                gedeelde data van de band. Raken alle bandleden hun wachtwoord én herstelcode kwijt,
+                dan is de inhoud van de band definitief weg — niet meer terug te halen. Daarom heeft
+                iedereen het liefst een eigen herstelcode.
+            </p>
             <p class="text-muted small mb-3">
-                Met je herstelcode kun je je versleutelde bands openen als je je wachtwoord vergeet.
-                Eén herstelcode geldt voor al je bands. Ben je 'm kwijt? Genereer hieronder een nieuwe —
+                Eén herstelcode geldt voor al je bands. Bewaar 'm op een veilige plek, bijvoorbeeld
+                in een wachtwoordmanager of op papier. Ben je 'm kwijt? Genereer hieronder een nieuwe —
                 de oude vervalt dan.
             </p>
 
