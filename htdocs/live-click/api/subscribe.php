@@ -16,6 +16,23 @@ if (!mollieEnabled()) {
     exit;
 }
 
+/* ---- Tijdelijke diagnose: welke Mollie-config gebruikt de server? ----
+   Toont GEEN volledige key, alleen of die gezet is + het prefix. Verwijder dit
+   blok zodra de configuratie werkt. */
+if ($method === 'GET' && ($_GET['debug'] ?? '') === 'config') {
+    $key = defined('MOLLIE_API_KEY') ? MOLLIE_API_KEY : '';
+    echo json_encode([
+        'ok'                => true,
+        'mollie_enabled'    => mollieEnabled(),
+        'billing_enforced'  => billingEnforced(),
+        'api_key_set'       => $key !== '',
+        'api_key_prefix'    => $key !== '' ? substr($key, 0, 5) . '…' : '(leeg)',
+        'redirect_url'      => defined('MOLLIE_REDIRECT_URL') ? MOLLIE_REDIRECT_URL : '(niet gedefinieerd)',
+        'webhook_url'       => defined('MOLLIE_WEBHOOK_URL') ? MOLLIE_WEBHOOK_URL : '(niet gedefinieerd)',
+    ], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 /* ---- GET: huidige abonnementsstatus ---- */
 if ($method === 'GET') {
     $sub = getUserSubscription($userId);
