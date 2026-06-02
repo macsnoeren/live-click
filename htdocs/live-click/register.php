@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="alert alert-success">
             <i class="bi bi-check-circle-fill me-2"></i>
             <strong>Account aangemaakt!</strong><br>
-            <span class="small">Een admin koppelt je aan een band. Je kunt nu inloggen.</span>
+            <span class="small">Je kunt nu inloggen. Maak daarna een nieuwe band aan of gebruik een uitnodigingslink.</span>
         </div>
         <a href="login.php" class="btn btn-danger w-100 mt-2">
             <i class="bi bi-box-arrow-in-right"></i> Inloggen

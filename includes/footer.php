@@ -78,16 +78,64 @@ if (function_exists('currentUser')) {
         </div>
     </div>
 </div>
+
+<!-- E2EE: herinnering om een herstelcode aan te maken. Verschijnt alleen als de
+     kluis ontgrendeld is én er nog geen herstelcode is ingesteld (per gebruiker).
+     Zonder herstelcode kan niemand — ook een admin niet — de kluis openen na een
+     vergeten wachtwoord. -->
+<div class="modal fade" id="lgRecoveryNudge" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-shield-exclamation"></i> Maak een herstelcode aan</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-0">
+                    Je bent lid van een <strong>versleutelde band</strong>, maar je hebt zelf nog geen herstelcode.
+                    Vergeet je je wachtwoord, dan kan <strong>niemand</strong> — ook een beheerder niet — je toegang
+                    tot de versleutelde inhoud herstellen. Met een herstelcode open je je kluis altijd weer.
+                </p>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Later</button>
+                <a href="profile.php#recovery-card" class="btn btn-warning">
+                    <i class="bi bi-shield-lock"></i> Herstelcode aanmaken
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 <script>
 (function () {
     var inEncBand = <?= $lgInEncryptedBand ? 'true' : 'false' ?>;
     if (!window.LGKeys) return;
 
+    // Eénmalig per sessie nudgen om een herstelcode in te stellen. We tonen het
+    // alleen als de kluis ontgrendeld is (dan kán de gebruiker er een maken) en
+    // er nog geen herstelcode bestaat (api/keys.php → has_recovery).
+    function maybeNudgeRecovery() {
+        try { if (sessionStorage.getItem('lgRecoveryNudgeDismissed')) return; } catch (e) {}
+        if (!window.jQuery) return;
+        jQuery.get('api/keys.php').done(function (st) {
+            if (!st || !st.ok || !st.has_keys || st.has_recovery) return;
+            var el = document.getElementById('lgRecoveryNudge');
+            if (window.bootstrap && el) {
+                try {
+                    new bootstrap.Modal(el).show();
+                    el.addEventListener('hidden.bs.modal', function () {
+                        try { sessionStorage.setItem('lgRecoveryNudgeDismissed', '1'); } catch (e) {}
+                    }, { once: true });
+                } catch (e) {}
+            }
+        });
+    }
+
     LGKeys.bootstrap().then(function (state) {
         if (!inEncBand) return;
-        if (state === 'unlocked') return;
         if (state === 'unsupported') return; // geen WebCrypto → niets te ontgrendelen
+        if (state === 'unlocked') { maybeNudgeRecovery(); return; }
         // Kluis zit op slot terwijl er versleutelde bands zijn → prompt tonen.
         if (window.bootstrap && document.getElementById('lgUnlockModal')) {
             try { new bootstrap.Modal('#lgUnlockModal').show(); } catch (e) {}
