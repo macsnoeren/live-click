@@ -84,6 +84,10 @@ function mollieRequest(string $method, string $path, ?array $body = null): array
     }
     if ($code >= 400) {
         $detail = $data['detail'] ?? ('HTTP ' . $code);
+        // Mollie noemt vaak het specifieke veld dat het afkeurt — heel nuttig
+        // voor diagnose (bv. welke URL het schema-probleem geeft).
+        $field  = $data['field'] ?? ($data['_embedded']['errors'][0]['field'] ?? null);
+        if ($field) $detail .= ' (veld: ' . $field . ')';
         throw new RuntimeException('Mollie-fout: ' . $detail);
     }
     return $data;
