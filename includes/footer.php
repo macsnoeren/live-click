@@ -91,15 +91,23 @@ if (function_exists('currentUser')) {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Sluiten"></button>
             </div>
             <div class="modal-body">
+                <p class="text-muted small mb-2">
+                    Je bent lid van een <strong>versleutelde band</strong>. De nummers, setlijsten en notities
+                    daarvan zijn zo opgeslagen dat <strong>alleen de bandleden ze kunnen lezen</strong> — je opent
+                    ze met je wachtwoord.
+                </p>
+                <p class="text-muted small mb-2">
+                    Je hebt zelf nog geen herstelcode. Vergeet je je wachtwoord, dan kan <strong>niemand</strong> dat
+                    voor je terugzetten — ook een beheerder niet. Zonder herstelcode raak je dan je toegang tot de
+                    band-inhoud kwijt.
+                </p>
                 <p class="text-muted small mb-0">
-                    Je bent lid van een <strong>versleutelde band</strong>, maar je hebt zelf nog geen herstelcode.
-                    Vergeet je je wachtwoord, dan kan <strong>niemand</strong> — ook een beheerder niet — je toegang
-                    tot de versleutelde inhoud herstellen. Met een herstelcode open je je kluis altijd weer.
+                    Een herstelcode is je eigen reservesleutel om er altijd weer bij te komen. Het kost één minuut.
                 </p>
             </div>
             <div class="modal-footer border-secondary">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Later</button>
-                <a href="profile.php#recovery-card" class="btn btn-warning">
+                <a href="profile.php#recovery-card" class="btn btn-warning" onclick="lgDismissRecoveryNudge()">
                     <i class="bi bi-shield-lock"></i> Herstelcode aanmaken
                 </a>
             </div>
@@ -117,6 +125,9 @@ if (function_exists('currentUser')) {
     // er nog geen herstelcode bestaat (api/keys.php → has_recovery).
     function maybeNudgeRecovery() {
         try { if (sessionStorage.getItem('lgRecoveryNudgeDismissed')) return; } catch (e) {}
+        // Niet nudgen op de profielpagina zelf — daar staat de herstelcode-kaart al,
+        // en anders blijft de popup terugkomen terwijl je 'm juist aanmaakt.
+        if (/\/profile\.php$/.test(location.pathname)) return;
         if (!window.jQuery) return;
         jQuery.get('api/keys.php').done(function (st) {
             if (!st || !st.ok || !st.has_keys || st.has_recovery) return;
@@ -142,6 +153,13 @@ if (function_exists('currentUser')) {
         }
     }).catch(function () {});
 })();
+
+// Wordt aangeroepen vanuit de "Herstelcode aanmaken"-knop in de nudge-modal:
+// onderdruk de nudge voor de rest van deze sessie zodat hij niet opnieuw
+// verschijnt terwijl de gebruiker naar Profiel navigeert om er een te maken.
+function lgDismissRecoveryNudge() {
+    try { sessionStorage.setItem('lgRecoveryNudgeDismissed', '1'); } catch (e) {}
+}
 
 function lgShowRecover() {
     document.getElementById('lg-recover-box').style.display = '';
