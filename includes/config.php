@@ -34,6 +34,17 @@ if (!defined('GETSONGBPM_API_KEY')) {
     define('GETSONGBPM_API_KEY', getenv('LIVEGIG_GETSONGBPM_API_KEY') ?: '');
 }
 
+// Mollie (betalingen/abonnementen). Leeg = betaalfunctie staat uit.
+if (!defined('MOLLIE_API_KEY')) {
+    define('MOLLIE_API_KEY', getenv('LIVEGIG_MOLLIE_API_KEY') ?: '');
+}
+if (!defined('MOLLIE_REDIRECT_URL')) {
+    define('MOLLIE_REDIRECT_URL', getenv('LIVEGIG_MOLLIE_REDIRECT_URL') ?: '');
+}
+if (!defined('MOLLIE_WEBHOOK_URL')) {
+    define('MOLLIE_WEBHOOK_URL', getenv('LIVEGIG_MOLLIE_WEBHOOK_URL') ?: '');
+}
+
 // Token cache: Spotify access token op disk (verlopen na 1 uur)
 if (!defined('SPOTIFY_TOKEN_CACHE_FILE')) {
     define('SPOTIFY_TOKEN_CACHE_FILE', __DIR__ . '/../data/.spotify_token');
