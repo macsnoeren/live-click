@@ -39,6 +39,40 @@ if ($method === 'GET' && ($_GET['debug'] ?? '') === 'config') {
     exit;
 }
 
+/* ---- Tijdelijke diagnose: rauwe testbetaling rechtstreeks naar Mollie ----
+   Doet een minimale 'oneoff' betaling met alleen amount+description+redirectUrl+
+   webhookUrl, en geeft de EXACTE verzonden body + Mollie's rauwe antwoord terug.
+   Zo zien we precies wat Mollie afkeurt. Verwijder dit blok na de diagnose. */
+if ($method === 'GET' && ($_GET['debug'] ?? '') === 'testpay') {
+    $body = [
+        'amount'      => ['currency' => 'EUR', 'value' => '0.01'],
+        'description' => 'LiveGig testpay',
+        'redirectUrl' => defined('MOLLIE_REDIRECT_URL') ? MOLLIE_REDIRECT_URL : '',
+        'webhookUrl'  => defined('MOLLIE_WEBHOOK_URL') ? MOLLIE_WEBHOOK_URL : '',
+    ];
+    $json = json_encode($body, JSON_UNESCAPED_SLASHES);
+    $ch = curl_init('https://api.mollie.com/v2/payments');
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST  => 'POST',
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . MOLLIE_API_KEY, 'Content-Type: application/json'],
+        CURLOPT_POSTFIELDS     => $json,
+        CURLOPT_TIMEOUT        => 20,
+    ]);
+    $raw  = curl_exec($ch);
+    $err  = curl_error($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'sent_body'     => $json,
+        'http_code'     => $code,
+        'curl_error'    => $err,
+        'mollie_raw'    => $raw ? json_decode($raw, true) : null,
+    ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    exit;
+}
+
 /* ---- GET: huidige abonnementsstatus ---- */
 if ($method === 'GET') {
     $sub = getUserSubscription($userId);
