@@ -127,7 +127,7 @@ if ($method === 'POST') {
             echo json_encode(['ok'=>false,'error'=>'Deze band heeft al een leider']); exit;
         }
         // Leider worden vereist actieve facturatie (geen nieuwe proef bij overname).
-        if (mollieEnabled() && !userHasActiveBilling($user['id'])) {
+        if (billingEnforced() && !userHasActiveBilling($user['id'])) {
             echo json_encode(['ok'=>false,'needs_subscription'=>true,
                 'error'=>'Leider worden vereist een actief abonnement.']); exit;
         }
@@ -155,7 +155,7 @@ if ($method === 'POST') {
         // Aanmaken — de maker wordt leider, en leider zijn is betaald. Vereist
         // dus een actief abonnement of lopende proefperiode. Lid/kijker zijn
         // blijft gratis (dat loopt via join.php, niet hierlangs).
-        if (mollieEnabled() && !userHasActiveBilling($user['id'])) {
+        if (billingEnforced() && !userHasActiveBilling($user['id'])) {
             echo json_encode([
                 'ok' => false,
                 'needs_subscription' => true,

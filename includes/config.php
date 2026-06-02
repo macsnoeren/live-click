@@ -63,6 +63,13 @@ if (!defined('MOLLIE_TRIAL_DAYS')) {
 if (!defined('MOLLIE_MANDATE_AMOUNT')) {
     define('MOLLIE_MANDATE_AMOUNT', getenv('LIVEGIG_MOLLIE_MANDATE_AMOUNT') ?: '0.01');
 }
+// Wordt de paywall AFGEDWONGEN? Losgekoppeld van de API-key, zodat je een
+// (test)key kunt instellen en de betaalflow kunt testen ZONDER dat bestaande
+// bands meteen geblokkeerd raken. Zet dit pas op '1' als je echt live gaat
+// (en je bestaande leiders hebt vrijgesteld — zie admin Betalingen).
+if (!defined('MOLLIE_BILLING_ENFORCED')) {
+    define('MOLLIE_BILLING_ENFORCED', (getenv('LIVEGIG_MOLLIE_BILLING_ENFORCED') ?: '0') === '1');
+}
 
 // Token cache: Spotify access token op disk (verlopen na 1 uur)
 if (!defined('SPOTIFY_TOKEN_CACHE_FILE')) {

@@ -70,7 +70,10 @@ if ($method === 'POST') {
             if (!$checkout) { echo json_encode(['ok' => false, 'error' => 'Geen betaal-URL ontvangen van Mollie.']); exit; }
         } catch (RuntimeException $e) {
             error_log('subscribe.start: ' . $e->getMessage());
-            echo json_encode(['ok' => false, 'error' => 'Kon de betaling niet starten. Probeer het later opnieuw.']);
+            // Tijdens het opzetten tonen we de echte Mollie-fout, zodat je kunt
+            // zien wat er misgaat (bv. ongeldige key of webhook-URL). Vervang dit
+            // later door een generieke melding voor eindgebruikers.
+            echo json_encode(['ok' => false, 'error' => 'Mollie: ' . $e->getMessage()]);
             exit;
         }
 

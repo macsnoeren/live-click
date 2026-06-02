@@ -31,6 +31,16 @@ function mollieEnabled(): bool {
 }
 
 /**
+ * Wordt de paywall daadwerkelijk afgedwongen? Vereist zowel een geconfigureerde
+ * key ALS de expliciete schakelaar MOLLIE_BILLING_ENFORCED. Zo lock je niet per
+ * ongeluk iedereen buiten zodra er een (test)key staat — testen kan los van
+ * afdwingen.
+ */
+function billingEnforced(): bool {
+    return mollieEnabled() && defined('MOLLIE_BILLING_ENFORCED') && MOLLIE_BILLING_ENFORCED === true;
+}
+
+/**
  * Doe een geauthenticeerde call naar de Mollie-API.
  *
  * @throws RuntimeException bij transport- of API-fouten.
@@ -177,7 +187,7 @@ function bandLeaderIds(int $bandId): array {
  * installaties ongewijzigd blijven werken.
  */
 function bandIsBlocked(int $bandId): bool {
-    if (!mollieEnabled()) return false;
+    if (!billingEnforced()) return false;
     $leaders = bandLeaderIds($bandId);
     if (!$leaders) return true;                   // leiderloos → geblokkeerd
     foreach ($leaders as $lid) {
