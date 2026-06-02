@@ -105,6 +105,15 @@ function mollieCreateCustomer(string $name, string $email): array {
  * geïncasseerd worden.
  */
 function mollieCreateFirstPayment(string $customerId, int $userId): array {
+    // Mollie vereist een geldige https-redirectUrl én -webhookUrl. Een lege of
+    // niet-https waarde geeft anders de cryptische fout "URL scheme not allowed".
+    foreach (['MOLLIE_REDIRECT_URL' => MOLLIE_REDIRECT_URL, 'MOLLIE_WEBHOOK_URL' => MOLLIE_WEBHOOK_URL] as $name => $url) {
+        if (!preg_match('#^https://#i', (string)$url)) {
+            throw new RuntimeException(
+                "$name is niet ingesteld als geldige https-URL. Vul deze in config.local.php in."
+            );
+        }
+    }
     return mollieRequest('POST', '/payments', [
         'amount'       => ['currency' => 'EUR', 'value' => (string)MOLLIE_MANDATE_AMOUNT],
         'customerId'   => $customerId,
