@@ -104,6 +104,22 @@ function userStorageRemaining(int $userId): int {
     return userStorageUsage($userId)['remaining_bytes'];
 }
 
+/** Huidige opslag (bytes) van één nummer-rij — zelfde kolommen als de meting. */
+function songStorageBytes(int $songId): int {
+    $s = getDB()->prepare("SELECT COALESCE(
+            length(CAST(COALESCE(enc_blob,'')      AS BLOB)) +
+            length(CAST(COALESCE(lyrics,'')        AS BLOB)) +
+            length(CAST(COALESCE(chords,'')        AS BLOB)) +
+            length(CAST(COALESCE(drum_notation,'') AS BLOB)) +
+            length(CAST(COALESCE(drum_svg,'')      AS BLOB)) +
+            length(CAST(COALESCE(description,'')   AS BLOB)) +
+            length(CAST(COALESCE(title,'')         AS BLOB)) +
+            length(CAST(COALESCE(artist,'')        AS BLOB))
+        , 0) FROM songs WHERE id = ?");
+    $s->execute([$songId]);
+    return (int)$s->fetchColumn();
+}
+
 /**
  * De "eigenaar" van een band voor quotum-doeleinden: de oudste leider
  * (laagste band_members.id met rol leader). Null als de band leiderloos is.
