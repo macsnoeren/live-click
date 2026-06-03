@@ -48,6 +48,31 @@ require APP_ROOT . '/includes/header.php';
         </div>
     </div>
 
+    <!-- ── Opslag (fair-use) ─────────────────────────────────────────────── -->
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-hdd-fill me-2"></i>Opslag (fair-use)</div>
+        <div class="card-body">
+            <p class="text-muted small mb-2">
+                Het fair-use beleid geeft je <strong><span id="st-quota">500 MB</span></strong> opslag
+                voor de bands die je leidt (nummers, setlijsten en PDF-bladmuziek samen).
+                Lid of kijker zijn van andermans band kost jou geen ruimte.
+            </p>
+            <div class="progress mb-2" style="height:1.25rem" role="progressbar">
+                <div id="st-bar" class="progress-bar bg-danger" style="width:0%">0%</div>
+            </div>
+            <div class="d-flex justify-content-between small">
+                <span class="text-muted"><span id="st-used">—</span> gebruikt</span>
+                <span class="text-muted"><span id="st-remaining">—</span> over</span>
+            </div>
+            <div id="st-detail" class="text-muted small mt-2"></div>
+            <div id="st-over" class="alert alert-warning py-2 small mt-3 mb-0" style="display:none">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                Je hebt de opslaglimiet bereikt. Verwijder bladmuziek of nummers om weer ruimte vrij te maken;
+                tot die tijd kun je geen nieuwe PDF's uploaden.
+            </div>
+        </div>
+    </div>
+
     <!-- ── Herstelcode (kluis) ───────────────────────────────────────────── -->
     <div class="card mb-4" id="recovery-card" style="display:none">
         <div class="card-header"><i class="bi bi-shield-lock-fill me-2"></i>Herstelcode versleuteling</div>
@@ -222,6 +247,35 @@ require APP_ROOT . '/includes/header.php';
 $qrVer = filemtime(APP_ROOT . '/htdocs/live-click/assets/vendor/qrcode/qrcode.min.js');
 $extraScripts = '<script src="assets/vendor/qrcode/qrcode.min.js?v=' . $qrVer . '"></script>
 <script>
+// ── Opslag (fair-use) ─────────────────────────────────────────────────────
+function fmtBytes(b) {
+    b = Number(b) || 0;
+    if (b < 1024) return b + " B";
+    var kb = b / 1024;
+    if (kb < 1024) return kb.toFixed(kb < 10 ? 1 : 0) + " KB";
+    var mb = kb / 1024;
+    if (mb < 1024) return mb.toFixed(mb < 10 ? 1 : 0) + " MB";
+    return (mb / 1024).toFixed(2) + " GB";
+}
+
+$(function() {
+    $.get("api/storage.php").done(function(r) {
+        if (!r || !r.ok) return;
+        var u = r.usage;
+        $("#st-quota").text(fmtBytes(u.quota_bytes));
+        $("#st-used").text(fmtBytes(u.used_bytes));
+        $("#st-remaining").text(fmtBytes(u.remaining_bytes));
+        var bar = $("#st-bar");
+        bar.css("width", u.percent + "%").text(u.percent + "%");
+        // Kleur: groen < 75%, geel < 90%, rood daarboven.
+        bar.removeClass("bg-danger bg-warning bg-success")
+           .addClass(u.percent >= 90 ? "bg-danger" : (u.percent >= 75 ? "bg-warning" : "bg-success"));
+        $("#st-detail").html("Bladmuziek (PDF): " + fmtBytes(u.pdf_bytes)
+            + " &middot; Nummers &amp; setlijsten: " + fmtBytes(u.db_bytes));
+        $("#st-over").toggle(!!u.over);
+    });
+});
+
 // ── Herstelcode (kluis) ───────────────────────────────────────────────────
 // Toon de kaart alleen als de gebruiker een sleutelpaar heeft. De genereer-knop
 // werkt alleen als de kluis ontgrendeld is (privésleutel in de sessie).

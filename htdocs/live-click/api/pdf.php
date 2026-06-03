@@ -14,6 +14,7 @@
  */
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/storage.php';
 requireLogin();
 csrfRequire(); // no-op voor GET; verplicht voor POST/DELETE
 
@@ -120,6 +121,27 @@ if ($method === 'POST') {
     }
     if (!$isPdf) {
         pdfJson(['ok' => false, 'error' => 'Alleen PDF-bestanden zijn toegestaan.'], 415);
+    }
+
+    // Fair-use: weiger als deze upload het opslagquotum van de bandeigenaar
+    // (de leider) zou overschrijden. Vervang je een bestaande PDF, dan komt die
+    // ruimte vrij — daarom de oude grootte aftrekken zodat het niet dubbel telt.
+    $ownerId = bandStorageOwnerId((int)$song['band_id']);
+    if ($ownerId !== null) {
+        $usage   = userStorageUsage($ownerId);
+        $oldSize = 0;
+        if (!empty($song['pdf_path'])) {
+            $oldFull = LG_PDF_DIR . '/' . basename($song['pdf_path']);
+            if (is_file($oldFull)) $oldSize = (int)filesize($oldFull);
+        }
+        $projected = $usage['used_bytes'] - $oldSize + (int)$f['size'];
+        if ($projected > $usage['quota_bytes']) {
+            pdfJson([
+                'ok'         => false,
+                'over_quota' => true,
+                'error'      => 'Opslaglimiet (fair-use) bereikt. Maak ruimte vrij door bladmuziek of nummers te verwijderen.',
+            ], 413);
+        }
     }
 
     if (!is_dir(LG_PDF_DIR) && !@mkdir(LG_PDF_DIR, 0775, true) && !is_dir(LG_PDF_DIR)) {
