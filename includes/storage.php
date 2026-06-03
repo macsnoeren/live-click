@@ -13,6 +13,10 @@
  * Spotify-previews tellen NIET mee (externe URL's, geen lokale opslag).
  */
 
+// config.php (dat config.local.php inleest) MOET vóór de quotum-bepaling geladen
+// zijn, anders worden je define('STORAGE_QUOTA_MB', …)/STORAGE_QUOTA_BYTES niet
+// opgepikt. Niet leunen op de include-keten — hier expliciet laden.
+require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 
 if (!defined('STORAGE_QUOTA_BYTES')) {

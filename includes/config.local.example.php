@@ -20,3 +20,10 @@ define('MOLLIE_WEBHOOK_URL',  '');  // bv. https://jouwdomein.nl/live-click/api/
 // Paywall afdwingen (bands zonder betalende leider blokkeren)? Laat false tijdens
 // testen; true pas bij live-gang nadat bestaande leiders zijn vrijgesteld.
 define('MOLLIE_BILLING_ENFORCED', false);
+
+// Fair-use opslaglimiet per gebruiker (som van de bands die hij/zij leidt).
+// Standaard 500 MB. Overschrijf met EEN van onderstaande (niet allebei):
+//   define('STORAGE_QUOTA_MB', 500);              // in megabytes (handig)
+//   define('STORAGE_QUOTA_BYTES', 500*1024*1024); // exacte bytes
+// Tip: zet tijdelijk op 1 (MB) om de blokkering te testen.
+// define('STORAGE_QUOTA_MB', 500);
