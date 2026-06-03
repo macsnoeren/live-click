@@ -16,10 +16,14 @@
 require_once __DIR__ . '/db.php';
 
 if (!defined('STORAGE_QUOTA_BYTES')) {
-    // 500 MB per gebruiker. Overschrijfbaar door dit elders eerder te definiëren
-    // of via de env-var LIVEGIG_STORAGE_QUOTA_MB.
-    $mb = (int)(getenv('LIVEGIG_STORAGE_QUOTA_MB') ?: 500);
-    define('STORAGE_QUOTA_BYTES', $mb * 1024 * 1024);
+    // 500 MB per gebruiker. Overschrijfbaar in config.local.php met:
+    //   define('STORAGE_QUOTA_MB', 1);     ← MB-waarde (handig voor testen)
+    //   define('STORAGE_QUOTA_BYTES', …);  ← exacte bytes
+    // of via de omgevingsvariabele LIVEGIG_STORAGE_QUOTA_MB.
+    $mb = defined('STORAGE_QUOTA_MB')
+        ? (int)STORAGE_QUOTA_MB
+        : (int)(getenv('LIVEGIG_STORAGE_QUOTA_MB') ?: 500);
+    define('STORAGE_QUOTA_BYTES', max(1, $mb) * 1024 * 1024);
 }
 
 /** Map met PDF-bestanden (buiten de webroot). */
