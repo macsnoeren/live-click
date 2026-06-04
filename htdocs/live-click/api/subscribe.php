@@ -103,6 +103,19 @@ if ($method === 'GET' && ($_GET['debug'] ?? '') === 'methods') {
     exit;
 }
 
+/* ---- Tijdelijke diagnose: volledige abonnementsrij + laatste betalingen ---- */
+if ($method === 'GET' && ($_GET['debug'] ?? '') === 'sub') {
+    header('Content-Type: application/json');
+    $p = $db->prepare("SELECT mollie_payment_id, amount, status, created_at, paid_at
+                         FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 10");
+    $p->execute([$userId]);
+    echo json_encode([
+        'subscription'    => getUserSubscription($userId),
+        'recent_payments' => $p->fetchAll(),
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 /* ---- GET: huidige abonnementsstatus ---- */
 if ($method === 'GET') {
     $sub = getUserSubscription($userId);
@@ -213,6 +226,27 @@ if ($method === 'POST') {
         $db->prepare("UPDATE subscriptions SET status='canceled', canceled_at=CURRENT_TIMESTAMP WHERE id=?")
            ->execute([$sub['id']]);
         auditLog('subscription.cancel', 'user', $userId);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    /* ---- Tijdelijk testhulpmiddel: abonnement van de huidige gebruiker wissen ----
+       Alleen voor admins. Verwijdert de subscription-rij + betalingen zodat je de
+       hele flow (incl. gratis proefmaand) schoon opnieuw kunt doorlopen. Zet bij
+       Mollie eventueel ook het abonnement stop. Verwijder dit blok vóór productie. */
+    if ($action === 'reset') {
+        if (($user['role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Alleen een admin mag resetten.']); exit;
+        }
+        $sub = getUserSubscription($userId);
+        if ($sub && !empty($sub['mollie_customer_id']) && !empty($sub['mollie_subscription_id'])) {
+            try { mollieCancelSubscription($sub['mollie_customer_id'], $sub['mollie_subscription_id']); }
+            catch (RuntimeException $e) { error_log('subscribe.reset: ' . $e->getMessage()); }
+        }
+        $db->prepare('DELETE FROM payments WHERE user_id = ?')->execute([$userId]);
+        $db->prepare('DELETE FROM subscriptions WHERE user_id = ?')->execute([$userId]);
+        auditLog('subscription.reset_for_test', 'user', $userId);
         echo json_encode(['ok' => true]);
         exit;
     }
