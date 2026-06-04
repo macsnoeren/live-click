@@ -80,8 +80,8 @@ require APP_ROOT . '/includes/header.php';
             <div class="card mb-4">
                 <div class="table-responsive">
                 <table class="table table-dark table-hover table-sm mb-0">
-                    <thead><tr><th>Gebruiker</th><th>Status</th><th>Bedrag</th><th>Interval</th><th>Korting</th><th>Volgende incasso</th></tr></thead>
-                    <tbody id="subs-tbody"><tr><td colspan="6" class="text-muted">Laden...</td></tr></tbody>
+                    <thead><tr><th>Gebruiker</th><th>Status</th><th>Bedrag</th><th>Interval</th><th>Proef</th><th>Volgende incasso</th><th>Korting</th><th>Mollie</th></tr></thead>
+                    <tbody id="subs-tbody"><tr><td colspan="8" class="text-muted">Laden...</td></tr></tbody>
                 </table>
                 </div>
             </div>
@@ -477,15 +477,25 @@ function loadPayments() {
 
 function renderSubs(subs) {
     var tb = $("#subs-tbody"); tb.empty();
-    if (!subs.length) { tb.append(\'<tr><td colspan="6" class="text-muted">Nog geen abonnementen</td></tr>\'); return; }
+    if (!subs.length) { tb.append(\'<tr><td colspan="8" class="text-muted">Nog geen abonnementen</td></tr>\'); return; }
     subs.forEach(function(s) {
+        var proef = (s.status === "trialing" && s.trial_ends_at)
+            ? "tot " + escHtml(s.trial_ends_at)
+            : (s.trial_used == 1 ? "verbruikt" : "—");
+        var ids = [];
+        if (s.mollie_customer_id)     ids.push(escHtml(s.mollie_customer_id));
+        if (s.mollie_subscription_id) ids.push(escHtml(s.mollie_subscription_id));
+        if (s.mollie_mandate_id)      ids.push(escHtml(s.mollie_mandate_id));
+        var mollie = ids.length ? ids.join("<br>") : "—";
         tb.append(\'<tr>\'
             + \'<td class="fw-semibold">\' + escHtml(s.username || "—") + \'<div class="text-muted small">\' + escHtml(s.email || "") + \'</div></td>\'
             + \'<td>\' + statusBadge(SUB_STATUS, s.status) + \'</td>\'
             + \'<td>\' + fmtMoney(s.amount, s.currency) + \'</td>\'
             + \'<td class="text-muted small">\' + escHtml(s.interval || "") + \'</td>\'
-            + \'<td class="text-muted small">\' + (s.discount_code ? escHtml(s.discount_code) : "—") + \'</td>\'
+            + \'<td class="text-muted small">\' + proef + \'</td>\'
             + \'<td class="text-muted small">\' + escHtml(s.next_payment_at || "—") + \'</td>\'
+            + \'<td class="text-muted small">\' + (s.discount_code ? escHtml(s.discount_code) : "—") + \'</td>\'
+            + \'<td class="text-muted small font-monospace" style="font-size:0.7rem">\' + mollie + \'</td>\'
             + \'</tr>\');
     });
 }

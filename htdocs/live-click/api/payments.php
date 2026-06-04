@@ -17,6 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $subscriptions = $db->query(
     "SELECT s.id, s.status, s.amount, s.currency, s.interval,
             s.trial_ends_at, s.next_payment_at, s.started_at, s.canceled_at,
+            s.created_at, s.trial_used,
+            s.mollie_customer_id, s.mollie_subscription_id, s.mollie_mandate_id,
             u.username, u.email,
             d.code AS discount_code
        FROM subscriptions s
