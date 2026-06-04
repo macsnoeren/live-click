@@ -1,0 +1,35 @@
+# Lokaal draaien/testen vóór de cluster.
+#
+#   docker compose up --build
+#   → open http://localhost:8080   (eerste login: admin / admin, daarna wijzigen)
+#
+# De data (SQLite-db, PDF's, tokencache) blijft bewaard in het named volume
+# 'livegig-data'. Verwijderen met:  docker compose down -v
+#
+# Secrets/instellingen kun je in een .env-bestand naast dit bestand zetten; de
+# variabelen hieronder pakken die automatisch op (met lege/standaard fallback).
+
+services:
+  livegig:
+    build: .
+    image: livegig:local
+    ports:
+      - "8080:80"
+    environment:
+      # Mollie — voor een lokale webhooktest heb je een publieke tunnel nodig
+      # (bv. ngrok) en zet je die URL in LIVEGIG_MOLLIE_WEBHOOK_URL.
+      LIVEGIG_MOLLIE_API_KEY: "${LIVEGIG_MOLLIE_API_KEY:-}"
+      LIVEGIG_MOLLIE_REDIRECT_URL: "${LIVEGIG_MOLLIE_REDIRECT_URL:-http://localhost:8080/betaling.php}"
+      LIVEGIG_MOLLIE_WEBHOOK_URL: "${LIVEGIG_MOLLIE_WEBHOOK_URL:-}"
+      LIVEGIG_MOLLIE_BILLING_ENFORCED: "${LIVEGIG_MOLLIE_BILLING_ENFORCED:-0}"
+      LIVEGIG_STORAGE_QUOTA_MB: "${LIVEGIG_STORAGE_QUOTA_MB:-500}"
+      # Spotify (optioneel, voor BPM/preview-opzoeken)
+      LIVEGIG_SPOTIFY_CLIENT_ID: "${LIVEGIG_SPOTIFY_CLIENT_ID:-}"
+      LIVEGIG_SPOTIFY_CLIENT_SECRET: "${LIVEGIG_SPOTIFY_CLIENT_SECRET:-}"
+      LIVEGIG_GETSONGBPM_API_KEY: "${LIVEGIG_GETSONGBPM_API_KEY:-}"
+    volumes:
+      - livegig-data:/var/www/html/data
+    restart: unless-stopped
+
+volumes:
+  livegig-data:
