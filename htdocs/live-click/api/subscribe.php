@@ -156,6 +156,17 @@ if ($method === 'POST') {
 
         $sub = getUserSubscription($userId);
 
+        // Bestaat er al een Mollie-abonnement (bv. door eerder starten), maar staat
+        // de lokale status verkeerd op 'pending'? Dan NIET opnieuw beginnen — dat zou
+        // een dubbel abonnement + nieuwe afschrijving geven. Herstel alleen de status.
+        if ($sub && !empty($sub['mollie_subscription_id']) && $sub['status'] !== 'canceled') {
+            $resync = (!empty($sub['trial_ends_at']) && strtotime($sub['trial_ends_at']) > time())
+                ? 'trialing' : 'active';
+            $db->prepare("UPDATE subscriptions SET status = ? WHERE id = ?")->execute([$resync, $sub['id']]);
+            echo json_encode(['ok' => true, 'already_active' => true]);
+            exit;
+        }
+
         try {
             // Customer (her)gebruiken of aanmaken.
             $customerId = $sub['mollie_customer_id'] ?? null;

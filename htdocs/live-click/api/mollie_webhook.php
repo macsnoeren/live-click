@@ -105,6 +105,16 @@ if ($seq === 'first') {
                 $trialEndsAt, $nextPayment, $sub['id'],
             ]);
             auditLog('subscription.activated', 'user', $userId, ['status' => $newStatus]);
+        } else {
+            // Het abonnement bestond al (bv. door een herstart), maar de status
+            // was op 'pending'/'suspended' blijven hangen. Zet die weer goed i.p.v.
+            // niets te doen — anders blijft de terugkeerpagina "verwerken" tonen.
+            if (in_array($sub['status'], ['pending', 'suspended'], true)) {
+                $active = (!empty($sub['trial_ends_at']) && strtotime($sub['trial_ends_at']) > time())
+                    ? 'trialing' : 'active';
+                $db->prepare("UPDATE subscriptions SET status=? WHERE id=?")->execute([$active, $sub['id']]);
+                auditLog('subscription.reactivated', 'user', $userId, ['status' => $active]);
+            }
         }
     } elseif (in_array($status, ['failed', 'canceled', 'expired'], true)) {
         // Mandaat niet verkregen — blijft 'pending', gebruiker kan opnieuw proberen.
