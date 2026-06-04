@@ -51,6 +51,20 @@ $csrf = csrfToken();
             <a href="bands.php" class="btn btn-link w-100 text-muted">Naar mijn bands</a>
         </div>
 
+        <!-- Mislukt / afgebroken -->
+        <div id="state-failed" style="display:none">
+            <i class="bi bi-x-circle-fill text-danger" style="font-size:3rem"></i>
+            <h5 class="text-white mt-3">Betaling niet gelukt</h5>
+            <p class="text-muted small">
+                Je betaling is niet voltooid of geannuleerd. Er is niets in rekening gebracht.
+                Je kunt het opnieuw proberen.
+            </p>
+            <a href="subscribe.php" class="btn btn-danger w-100 mt-2">
+                <i class="bi bi-arrow-repeat me-1"></i> Opnieuw proberen
+            </a>
+            <a href="dashboard.php" class="btn btn-link w-100 text-muted">Naar dashboard</a>
+        </div>
+
         <!-- Nog niet verwerkt / niet voltooid -->
         <div id="state-pending" style="display:none">
             <i class="bi bi-hourglass-split text-warning" style="font-size:3rem"></i>
@@ -73,7 +87,7 @@ $csrf = csrfToken();
     var tries = 0, maxTries = 12; // ~24s (elke 2s)
 
     function show(id) {
-        ["state-processing", "state-success", "state-pending"].forEach(function(s) {
+        ["state-processing", "state-success", "state-failed", "state-pending"].forEach(function(s) {
             document.getElementById(s).style.display = (s === id) ? "" : "none";
         });
     }
@@ -100,6 +114,11 @@ $csrf = csrfToken();
                 var sub = d && d.subscription;
                 var status = sub ? sub.status : null;
                 if (status === "trialing" || status === "active") { succeed(sub); return; }
+                // Betaling mislukt/afgebroken/verlopen → meteen duidelijke melding,
+                // niet blijven "verwerken".
+                if (["failed", "expired", "canceled"].indexOf(d.last_payment) !== -1) {
+                    show("state-failed"); return;
+                }
                 if (++tries >= maxTries) { show("state-pending"); return; }
                 setTimeout(poll, 2000);
             })

@@ -119,8 +119,14 @@ if ($method === 'GET' && ($_GET['debug'] ?? '') === 'sub') {
 /* ---- GET: huidige abonnementsstatus ---- */
 if ($method === 'GET') {
     $sub = getUserSubscription($userId);
+    // Status van de meest recente betaling — zodat de terugkeerpagina een
+    // mislukte/afgebroken betaling kan herkennen i.p.v. te blijven "verwerken".
+    $lp = $db->prepare("SELECT status FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+    $lp->execute([$userId]);
+    $lastPayment = $lp->fetchColumn() ?: null;
     echo json_encode([
         'ok'           => true,
+        'last_payment' => $lastPayment,
         'subscription' => $sub ? [
             'status'        => $sub['status'],
             'amount'        => $sub['amount'],
