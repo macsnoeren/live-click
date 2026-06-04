@@ -119,7 +119,13 @@ $csrf = csrfToken();
                 if (["failed", "expired", "canceled"].indexOf(d.last_payment) !== -1) {
                     show("state-failed"); return;
                 }
-                if (++tries >= maxTries) { show("state-pending"); return; }
+                if (++tries >= maxTries) {
+                    // Na de wachttijd: 'pending' = wordt nog echt verwerkt (bv.
+                    // overschrijving) → geduld. 'open'/geen betaling = niet afgerond
+                    // → toon de duidelijke "niet gelukt"-melding i.p.v. te blijven hangen.
+                    show(d.last_payment === "pending" ? "state-pending" : "state-failed");
+                    return;
+                }
                 setTimeout(poll, 2000);
             })
             .catch(function() {
