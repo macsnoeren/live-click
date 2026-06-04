@@ -35,6 +35,13 @@ require APP_ROOT . '/includes/header.php';
         en houdt LiveGig betaalbaar en onafhankelijk. <a href="principes.php" target="_blank" rel="noopener">Onze principes</a>.
     </p>
 
+    <?php if ($user['role'] === 'admin'): ?>
+    <div class="alert alert-info py-2 small">
+        <i class="bi bi-shield-fill me-1"></i>
+        Als beheerder heb je altijd volledige toegang — een abonnement is voor jou optioneel.
+    </div>
+    <?php endif; ?>
+
     <div class="card" id="sub-card">
         <div class="card-body">
             <div id="sub-status" class="text-muted">Status laden...</div>

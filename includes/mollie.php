@@ -193,6 +193,25 @@ function userTrialUsed(int $userId): bool {
     return $sub ? (int)$sub['trial_used'] === 1 : false;
 }
 
+/**
+ * Is deze gebruiker vrijgesteld van de paywall? Beheerders (role=admin) hebben
+ * altijd volledige toegang en hoeven geen abonnement — ze mogen er wel één nemen.
+ */
+function userBillingExempt(int $userId): bool {
+    $s = getDB()->prepare('SELECT role FROM users WHERE id = ?');
+    $s->execute([$userId]);
+    return $s->fetchColumn() === 'admin';
+}
+
+/**
+ * Mag deze gebruiker bands aanmaken/leiden? Waar bij een actief abonnement,
+ * een lopende proef, of een vrijstelling (admin). Dit is de check voor de
+ * paywall-gates; userHasActiveBilling() blijft puur over de abonnementsstatus.
+ */
+function userCanLeadBands(int $userId): bool {
+    return userBillingExempt($userId) || userHasActiveBilling($userId);
+}
+
 /** user_id's van alle leiders van een band. */
 function bandLeaderIds(int $bandId): array {
     $s = getDB()->prepare("SELECT user_id FROM band_members WHERE band_id=? AND role='leader'");
@@ -211,7 +230,9 @@ function bandIsBlocked(int $bandId): bool {
     $leaders = bandLeaderIds($bandId);
     if (!$leaders) return true;                   // leiderloos → geblokkeerd
     foreach ($leaders as $lid) {
-        if (userHasActiveBilling($lid)) return false;
+        // Een leider met actief abo/proef — of een admin-leider (vrijgesteld) —
+        // houdt de band toegankelijk.
+        if (userCanLeadBands($lid)) return false;
     }
     return true;
 }
