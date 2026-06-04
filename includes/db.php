@@ -231,6 +231,9 @@ function initSchema(PDO $db): void {
     // Facturatie: is de eenmalige gratis proefmaand al verbruikt door deze
     // gebruiker? Voorkomt een nieuwe proef bij een latere leiderschapsovername.
     try { $db->exec('ALTER TABLE subscriptions ADD COLUMN trial_used INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
+    // Bij opzeggen: tot wanneer de toegang nog geldig blijft (einde proef of einde
+    // betaalde maand). Daarna vervalt het abonnement. NULL = niet opgezegd.
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN ends_at DATETIME'); } catch (PDOException $e) {}
 
     // E2EE-kluis per band (zie PRIVACY.md, fase 2).
     //   is_encrypted — staat de kluis aan voor deze band?

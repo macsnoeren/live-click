@@ -67,6 +67,17 @@ function loadSubStatus() {
         var actEl = $("#sub-actions");
         actEl.empty();
 
+        // Opgezegd, maar nog binnen de betaalde/proefperiode → toegang tot ends_at,
+        // met de mogelijkheid om te heractiveren (gaat in vanaf het einde, geen kosten nu).
+        if (sub && sub.status === "canceled" && d.active) {
+            statusEl.html("<span class=\"badge bg-warning text-dark\">Opgezegd</span>"
+                + "<div class=\"small text-muted mt-2\">Je houdt toegang tot <strong>" + escHtml(sub.ends_at || "") + "</strong>. "
+                + "Daarna stopt het abonnement en worden je bands geblokkeerd.<br>"
+                + "Heractiveer je nu, dan loopt het gewoon door vanaf die datum — je betaalt nu niets extra.</div>");
+            actEl.html("<button class=\"btn btn-danger\" id=\"start-btn\" onclick=\"startSub()\"><i class=\"bi bi-arrow-repeat\"></i> Heractiveren</button>");
+            return;
+        }
+
         if (!sub || sub.status === "pending" || sub.status === "canceled") {
             var trialNote = d.trial_used
                 ? "Je gratis proefmaand is al gebruikt; het abonnement start direct."
@@ -95,14 +106,14 @@ function startSub() {
     $("#start-btn").prop("disabled", true);
     $.post("api/subscribe.php", JSON.stringify({action: "start"}), function(r) {
         if (r.checkout_url) { window.location.href = r.checkout_url; return; }
-        if (r.already_active) { loadSubStatus(); return; }
+        if (r.already_active || r.reactivated) { loadSubStatus(); return; }
         alert(r.error || "Kon de betaling niet starten.");
         $("#start-btn").prop("disabled", false);
     }, "json").fail(function() { alert("Er ging iets mis."); $("#start-btn").prop("disabled", false); });
 }
 
 function cancelSub() {
-    if (!confirm("Weet je zeker dat je je abonnement wilt opzeggen? Je bands worden daarna geblokkeerd.")) return;
+    if (!confirm("Abonnement opzeggen? Je houdt toegang tot het einde van de huidige periode; daarna worden je bands geblokkeerd. Je kunt vóór die tijd nog kosteloos heractiveren.")) return;
     $.post("api/subscribe.php", JSON.stringify({action: "cancel"}), function(r) {
         if (r.ok) loadSubStatus();
         else alert(r.error || "Opzeggen mislukt.");

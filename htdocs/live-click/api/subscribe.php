@@ -128,6 +128,7 @@ if ($method === 'GET') {
             'interval'      => $sub['interval'],
             'trial_ends_at' => $sub['trial_ends_at'],
             'next_payment_at' => $sub['next_payment_at'],
+            'ends_at'       => $sub['ends_at'],
             'trial_used'    => (int)$sub['trial_used'],
         ] : null,
         'active'       => userHasActiveBilling($userId),
@@ -142,10 +143,41 @@ if ($method === 'POST') {
 
     /* ---- Abonnement starten (eerste betaling / mandaat) ---- */
     if ($action === 'start') {
-        // Al actief? Dan niets te doen.
-        if (userHasActiveBilling($userId)) {
+        $sub = getUserSubscription($userId);
+
+        // Écht actief (proef/betaald, niet opgezegd) → niets te doen.
+        if ($sub && in_array($sub['status'], ['trialing', 'active'], true)) {
             echo json_encode(['ok' => true, 'already_active' => true]);
             exit;
+        }
+
+        // Heractiveren van een OPGEZEGD abonnement: maak een nieuw Mollie-abonnement
+        // dat pas ingaat zodra de huidige (proef-/betaalde) periode afloopt — met het
+        // bestaande mandaat, dus géén nieuwe activatiebetaling nu. Lukt dat niet
+        // (mandaat verlopen), dan valt 'ie door naar de gewone activatieflow.
+        if ($sub && $sub['status'] === 'canceled' && !empty($sub['mollie_customer_id'])) {
+            $endsAt    = $sub['ends_at'] ?? null;
+            $future    = $endsAt && strtotime($endsAt) > time();
+            $startDate = $future ? date('Y-m-d', strtotime($endsAt)) : null;
+            try {
+                $created    = mollieCreateSubscription($sub['mollie_customer_id'], $userId, $startDate);
+                // Loopt de proef nog? Dan blijft de status 'trialing' tot die afloopt.
+                $stillTrial = $future && !empty($sub['trial_ends_at']) && $endsAt === $sub['trial_ends_at'];
+                $newStatus  = $stillTrial ? 'trialing' : 'active';
+                $nextPay    = $created['nextPaymentDate'] ?? ($future ? $startDate : date('Y-m-d'));
+                $db->prepare(
+                    "UPDATE subscriptions
+                        SET mollie_subscription_id=?, status=?, canceled_at=NULL,
+                            ends_at=NULL, next_payment_at=?
+                      WHERE id=?"
+                )->execute([$created['id'], $newStatus, $nextPay, $sub['id']]);
+                auditLog('subscription.reactivated', 'user', $userId, ['status' => $newStatus]);
+                echo json_encode(['ok' => true, 'reactivated' => true]);
+                exit;
+            } catch (RuntimeException $e) {
+                error_log('subscribe.reactivate: ' . $e->getMessage());
+                // val door naar de gewone activatieflow (nieuwe first payment)
+            }
         }
 
         // E-mail/naam ophalen voor de Mollie-customer.
@@ -153,8 +185,6 @@ if ($method === 'POST') {
         $u->execute([$userId]);
         $info = $u->fetch();
         if (!$info) { echo json_encode(['ok' => false, 'error' => 'Gebruiker niet gevonden.']); exit; }
-
-        $sub = getUserSubscription($userId);
 
         // Bestaat er al een Mollie-abonnement (bv. door eerder starten), maar staat
         // de lokale status verkeerd op 'pending'? Dan NIET opnieuw beginnen — dat zou
@@ -234,10 +264,19 @@ if ($method === 'POST') {
             // Toch lokaal opzeggen — Mollie kan al opgezegd zijn.
         }
 
-        $db->prepare("UPDATE subscriptions SET status='canceled', canceled_at=CURRENT_TIMESTAMP WHERE id=?")
-           ->execute([$sub['id']]);
-        auditLog('subscription.cancel', 'user', $userId);
-        echo json_encode(['ok' => true]);
+        // Toegang blijft tot het einde van de huidige periode: einde proefmaand
+        // (bij 'trialing') of einde betaalde maand (next_payment_at). Daarna vervalt
+        // het. Het Mollie-abonnement is nu opgezegd, dus mollie_subscription_id leeg.
+        $endsAt = ($sub['status'] === 'trialing' && !empty($sub['trial_ends_at']))
+            ? $sub['trial_ends_at']
+            : ($sub['next_payment_at'] ?? null);
+        $db->prepare(
+            "UPDATE subscriptions
+                SET status='canceled', canceled_at=CURRENT_TIMESTAMP, ends_at=?, mollie_subscription_id=NULL
+              WHERE id=?"
+        )->execute([$endsAt, $sub['id']]);
+        auditLog('subscription.cancel', 'user', $userId, ['ends_at' => $endsAt]);
+        echo json_encode(['ok' => true, 'ends_at' => $endsAt]);
         exit;
     }
 

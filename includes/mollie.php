@@ -177,7 +177,14 @@ function getUserSubscription(int $userId): ?array {
 function userHasActiveBilling(int $userId): bool {
     $sub = getUserSubscription($userId);
     if (!$sub) return false;
-    return in_array($sub['status'], ['trialing', 'active'], true);
+    if (in_array($sub['status'], ['trialing', 'active'], true)) return true;
+    // Opgezegd, maar nog binnen de afgerekende periode (proef of betaalde maand):
+    // de gebruiker houdt toegang tot ends_at. Daarna vervalt het automatisch
+    // (geen cron nodig — deze check rekent live).
+    if ($sub['status'] === 'canceled' && !empty($sub['ends_at']) && strtotime($sub['ends_at']) > time()) {
+        return true;
+    }
+    return false;
 }
 
 /** Heeft de gebruiker zijn eenmalige gratis proef al verbruikt? */

@@ -487,9 +487,13 @@ function renderSubs(subs) {
         if (s.mollie_subscription_id) ids.push(escHtml(s.mollie_subscription_id));
         if (s.mollie_mandate_id)      ids.push(escHtml(s.mollie_mandate_id));
         var mollie = ids.length ? ids.join("<br>") : "—";
+        var statusCell = statusBadge(SUB_STATUS, s.status);
+        if (s.status === "canceled" && s.ends_at) {
+            statusCell += \'<div class="text-muted small">tot \' + escHtml(s.ends_at) + \'</div>\';
+        }
         tb.append(\'<tr>\'
             + \'<td class="fw-semibold">\' + escHtml(s.username || "—") + \'<div class="text-muted small">\' + escHtml(s.email || "") + \'</div></td>\'
-            + \'<td>\' + statusBadge(SUB_STATUS, s.status) + \'</td>\'
+            + \'<td>\' + statusCell + \'</td>\'
             + \'<td>\' + fmtMoney(s.amount, s.currency) + \'</td>\'
             + \'<td class="text-muted small">\' + escHtml(s.interval || "") + \'</td>\'
             + \'<td class="text-muted small">\' + proef + \'</td>\'
