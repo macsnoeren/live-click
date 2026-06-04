@@ -29,6 +29,11 @@ require APP_ROOT . '/includes/header.php';
         Je eerste <strong><?= $trialDays ?> dagen zijn gratis</strong> — daarna
         <strong><?= htmlspecialchars($amount) ?> per maand</strong>, maandelijks opzegbaar.
     </p>
+    <p class="text-muted small">
+        <i class="bi bi-heart me-1"></i>
+        Geen winstoogmerk — de bijdrage dekt enkel de kosten (hosting, opslag, back-ups en onderhoud)
+        en houdt LiveGig betaalbaar en onafhankelijk. <a href="principes.php" target="_blank" rel="noopener">Onze principes</a>.
+    </p>
 
     <div class="card" id="sub-card">
         <div class="card-body">
