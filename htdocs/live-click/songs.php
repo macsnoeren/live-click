@@ -582,6 +582,15 @@ function checkDuplicate() {
 
 $("#song-title, #song-artist").on("input", checkDuplicate);
 
+// Haalt de nette foutmelding uit een mislukt ajax-antwoord (ook bij HTTP 4xx,
+// zoals 413 over_quota of 403 geblokkeerd), i.p.v. de rauwe responsetekst.
+function ajaxErrorMessage(xhr, fallback) {
+    var j = xhr.responseJSON;
+    if (!j && xhr.responseText) { try { j = JSON.parse(xhr.responseText); } catch (e) {} }
+    if (j && j.error) return j.error;
+    return fallback || ("HTTP " + (xhr.status || "?"));
+}
+
 function saveSong() {
     var data = {
         id: $("#song-id").val(),
@@ -614,7 +623,7 @@ function saveSong() {
         }
     }
     function saveFail(xhr) {
-        alert("Opslaan mislukt (HTTP " + xhr.status + "): " + (xhr.responseText || "onbekende fout"));
+        alert(ajaxErrorMessage(xhr, "Opslaan mislukt (HTTP " + xhr.status + ")"));
     }
 
     if (BAND_ENCRYPTED && window.LGVault) {
@@ -653,7 +662,7 @@ function uploadPdf(songId, file, onOk, onErr) {
         if (r.ok) { if (onOk) onOk(); }
         else      { if (onErr) onErr(r.error || "onbekende fout"); }
     }).fail(function(xhr) {
-        if (onErr) onErr("HTTP " + xhr.status);
+        if (onErr) onErr(ajaxErrorMessage(xhr, "HTTP " + xhr.status));
     });
 }
 

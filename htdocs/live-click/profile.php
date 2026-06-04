@@ -272,7 +272,9 @@ $(function() {
            .addClass(u.percent >= 90 ? "bg-danger" : (u.percent >= 75 ? "bg-warning" : "bg-success"));
         $("#st-detail").html("Bladmuziek (PDF): " + fmtBytes(u.pdf_bytes)
             + " &middot; Nummers &amp; setlijsten: " + fmtBytes(u.db_bytes));
-        $("#st-over").toggle(!!u.over);
+        // Toon de "vol"-melding ook als je er praktisch tegenaan zit (100%),
+        // niet alleen bij strikt over de limiet.
+        $("#st-over").toggle(!!u.over || u.percent >= 100);
     });
 });
 

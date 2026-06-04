@@ -102,7 +102,9 @@ function userStorageUsage(int $userId): array {
         'used_bytes'      => $used,
         'quota_bytes'     => $quota,
         'remaining_bytes' => max(0, $quota - $used),
-        'percent'         => $quota > 0 ? min(100, (int)floor($used / $quota * 100)) : 0,
+        // Afronden i.p.v. naar beneden, zodat "bijna vol" netjes 100% toont en
+        // niet blijft hangen op 99% terwijl er praktisch geen ruimte meer is.
+        'percent'         => $quota > 0 ? min(100, (int)round($used / $quota * 100)) : 0,
         'over'            => $used >= $quota,
     ];
 }
