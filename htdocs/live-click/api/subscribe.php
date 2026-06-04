@@ -79,6 +79,30 @@ if ($method === 'GET' && ($_GET['debug'] ?? '') === 'testpay') {
     exit;
 }
 
+/* ---- Tijdelijke diagnose: welke betaalmethodes zijn beschikbaar? ----
+   Toont de methodes voor een first-payment (mandaat) bij het ingestelde bedrag,
+   plus alle ingeschakelde methodes. Verwijder na de diagnose. */
+if ($method === 'GET' && ($_GET['debug'] ?? '') === 'methods') {
+    header('Content-Type: application/json');
+    $amt = (string)($_GET['amount'] ?? MOLLIE_MANDATE_AMOUNT);
+    $fmt = function ($resp) {
+        return array_map(
+            fn($m) => ($m['id'] ?? '?') . ' — ' . ($m['description'] ?? ''),
+            $resp['_embedded']['methods'] ?? []
+        );
+    };
+    $out = ['mandate_amount' => (string)MOLLIE_MANDATE_AMOUNT, 'tested_amount' => $amt];
+    try {
+        $q = '/methods?sequenceType=first&amount[value]=' . rawurlencode($amt) . '&amount[currency]=EUR';
+        $out['first_payment_methods'] = $fmt(mollieRequest('GET', $q));
+    } catch (RuntimeException $e) { $out['first_payment_error'] = $e->getMessage(); }
+    try {
+        $out['all_enabled_methods'] = $fmt(mollieRequest('GET', '/methods'));
+    } catch (RuntimeException $e) { $out['all_methods_error'] = $e->getMessage(); }
+    echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 /* ---- GET: huidige abonnementsstatus ---- */
 if ($method === 'GET') {
     $sub = getUserSubscription($userId);
