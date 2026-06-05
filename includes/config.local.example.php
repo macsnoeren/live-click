@@ -27,3 +27,16 @@ define('MOLLIE_BILLING_ENFORCED', false);
 //   define('STORAGE_QUOTA_BYTES', 500*1024*1024); // exacte bytes
 // Tip: zet tijdelijk op 1 (MB) om de blokkering te testen.
 // define('STORAGE_QUOTA_MB', 500);
+
+// Tarieven (jaarabonnement) beheer je in de admin → Tarieven, niet hier.
+
+// Factuurgegevens (komen op de downloadbare factuur).
+// define('INVOICE_COMPANY_NAME',    'Jouw Bedrijf');
+// define('INVOICE_COMPANY_ADDRESS', "Straat 1\n1234 AB Plaats");
+// define('INVOICE_COMPANY_KVK',     '12345678');
+// define('INVOICE_COMPANY_VATID',   'NL001234567B01');
+// define('INVOICE_COMPANY_EMAIL',   'facturen@jouwbedrijf.nl');
+// define('INVOICE_VAT_PERCENT',     21);   // 0 = geen btw (bv. KOR)
+
+// Token waarmee api/cron.php (dagelijkse tariefverwerking) via HTTP mag draaien.
+// define('CRON_TOKEN', 'een-lange-willekeurige-string');

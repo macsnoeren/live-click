@@ -45,11 +45,13 @@ if (!defined('MOLLIE_WEBHOOK_URL')) {
     define('MOLLIE_WEBHOOK_URL', getenv('LIVEGIG_MOLLIE_WEBHOOK_URL') ?: '');
 }
 // Abonnementsvoorwaarden. Bedragen als string met punt-decimaal (Mollie-formaat).
+// Let op: de echte prijs komt uit de tarieventabel (admin → Tarieven). Deze
+// constanten zijn alleen een fallback als er nog géén tarief geconfigureerd is.
 if (!defined('MOLLIE_SUBSCRIPTION_AMOUNT')) {
-    define('MOLLIE_SUBSCRIPTION_AMOUNT', getenv('LIVEGIG_MOLLIE_SUBSCRIPTION_AMOUNT') ?: '2.50');
+    define('MOLLIE_SUBSCRIPTION_AMOUNT', getenv('LIVEGIG_MOLLIE_SUBSCRIPTION_AMOUNT') ?: '5.00');
 }
 if (!defined('MOLLIE_SUBSCRIPTION_INTERVAL')) {
-    define('MOLLIE_SUBSCRIPTION_INTERVAL', getenv('LIVEGIG_MOLLIE_SUBSCRIPTION_INTERVAL') ?: '1 month');
+    define('MOLLIE_SUBSCRIPTION_INTERVAL', getenv('LIVEGIG_MOLLIE_SUBSCRIPTION_INTERVAL') ?: '12 months');
 }
 if (!defined('MOLLIE_SUBSCRIPTION_DESCRIPTION')) {
     define('MOLLIE_SUBSCRIPTION_DESCRIPTION', getenv('LIVEGIG_MOLLIE_SUBSCRIPTION_DESCRIPTION') ?: 'LiveGig abonnement');
@@ -87,6 +89,12 @@ if (!defined('INVOICE_VAT_PERCENT')) {
 if (!defined('MOLLIE_MANDATE_AMOUNT')) {
     define('MOLLIE_MANDATE_AMOUNT', getenv('LIVEGIG_MOLLIE_MANDATE_AMOUNT') ?: '0.01');
 }
+// Token om api/cron.php vanaf buiten te mogen aanroepen (tariefverwerking e.d.).
+// Leeg = de webaanroep is uitgeschakeld (CLI werkt altijd).
+if (!defined('CRON_TOKEN')) {
+    define('CRON_TOKEN', getenv('LIVEGIG_CRON_TOKEN') ?: '');
+}
+
 // Wordt de paywall AFGEDWONGEN? Losgekoppeld van de API-key, zodat je een
 // (test)key kunt instellen en de betaalflow kunt testen ZONDER dat bestaande
 // bands meteen geblokkeerd raken. Zet dit pas op '1' als je echt live gaat

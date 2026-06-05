@@ -84,7 +84,8 @@ if ($seq === 'first') {
                 ? date('Y-m-d', time() + (int)MOLLIE_TRIAL_DAYS * 86400)
                 : null;
             try {
-                $created = mollieCreateSubscription($sub['mollie_customer_id'], $userId, $startDate);
+                $created = mollieCreateSubscription($sub['mollie_customer_id'], $userId, $startDate,
+                              (string)$sub['amount'], (string)$sub['interval']);
             } catch (RuntimeException $e) {
                 error_log('mollie_webhook create-subscription: ' . $e->getMessage());
                 http_response_code(200);

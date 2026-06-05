@@ -2,13 +2,21 @@
 require_once __DIR__ . '/bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/mollie.php';
+require_once APP_ROOT . '/includes/pricing.php';
 requireLogin();
 $user = currentUser();
 $pageTitle = 'Abonnement — LiveGig';
 
-$enabled = mollieEnabled();
-$amount  = $enabled ? MOLLIE_SUBSCRIPTION_AMOUNT : '';
+$enabled   = mollieEnabled();
 $trialDays = $enabled ? (int)MOLLIE_TRIAL_DAYS : 0;
+
+$pricing       = currentPricing();
+$prTotal       = pricingTotal($pricing);
+$prVatPct      = (float)$pricing['vat_percent'];
+$prInterval    = $pricing['interval'];
+$intervalLabel = in_array($prInterval, ['12 months', '1 year'], true) ? 'per jaar' : 'per ' . $prInterval;
+$fmtEur        = fn($v) => '€ ' . number_format((float)$v, 2, ',', '.');
+$vatLabel      = rtrim(rtrim(number_format($prVatPct, 2, ',', ''), '0'), ',');
 
 require APP_ROOT . '/includes/header.php';
 ?>
@@ -27,7 +35,13 @@ require APP_ROOT . '/includes/header.php';
         Registreren en meedoen als lid of kijker is gratis. Wil je zelf
         <strong>een band aanmaken en leiden</strong>, dan heb je een abonnement nodig.
         Je eerste <strong><?= $trialDays ?> dagen zijn gratis</strong> — daarna
-        <strong><?= htmlspecialchars($amount) ?> per maand</strong>, maandelijks opzegbaar.
+        <strong><?= $fmtEur($prTotal) ?> <?= htmlspecialchars($intervalLabel) ?></strong>, altijd opzegbaar.
+    </p>
+    <p class="text-muted small">
+        Opbouw: basis <?= $fmtEur($pricing['base_amount']) ?>
+        + Mollie-transactiekosten <?= $fmtEur($pricing['mollie_fee']) ?>
+        + <?= htmlspecialchars($vatLabel) ?>% btw
+        = <strong><?= $fmtEur($prTotal) ?></strong> <?= htmlspecialchars($intervalLabel) ?>.
     </p>
     <p class="text-muted small">
         <i class="bi bi-heart me-1"></i>

@@ -20,7 +20,7 @@ $payId  = (int)($_GET['payment_id'] ?? 0);
 
 $db = getDB();
 $stmt = $db->prepare(
-    'SELECT id, mollie_payment_id, amount, currency, status, description, paid_at, created_at
+    'SELECT id, subscription_id, mollie_payment_id, amount, currency, status, description, paid_at, created_at
        FROM payments WHERE id = ? AND user_id = ?'
 );
 $stmt->execute([$payId, $userId]);
@@ -36,11 +36,35 @@ function fmtEur($v): string {
 }
 
 $valid = $pay && $pay['status'] === 'paid';
-
-// Bedragen: het betaalde bedrag is inclusief btw. Splits uit als er btw geldt.
 $gross = $valid ? (float)$pay['amount'] : 0.0;
-$vatPct = (float)INVOICE_VAT_PERCENT;
-$net    = $vatPct > 0 ? $gross / (1 + $vatPct / 100) : $gross;
+
+// Is dit een abonnementsincasso? Dan splitsen we uit volgens de opgeslagen
+// prijscomponenten (basis + Mollie-kosten + btw). Anders (bv. de €0,01
+// activatiebetaling) vallen we terug op een simpele btw-splitsing.
+$subRow = null;
+if ($valid && !empty($pay['subscription_id'])) {
+    $sStmt = $db->prepare('SELECT base_amount, mollie_fee, vat_percent, amount FROM subscriptions WHERE id = ?');
+    $sStmt->execute([(int)$pay['subscription_id']]);
+    $subRow = $sStmt->fetch() ?: null;
+}
+$isSubCharge = $subRow && $subRow['base_amount'] !== null
+            && abs((float)$subRow['amount'] - $gross) < 0.01;
+
+$lines = []; // [ ['label'=>…, 'amount'=>…], … ]
+if ($isSubCharge) {
+    $vatPct = (float)$subRow['vat_percent'];
+    $base   = (float)$subRow['base_amount'];
+    $fee    = (float)$subRow['mollie_fee'];
+    $lines[] = ['label' => ($pay['description'] ?: 'LiveGig jaarabonnement'), 'amount' => $base];
+    if ($fee > 0) {
+        $lines[] = ['label' => 'Mollie-transactiekosten', 'amount' => $fee];
+    }
+    $net = $base + $fee;
+} else {
+    $vatPct  = (float)INVOICE_VAT_PERCENT;
+    $net     = $vatPct > 0 ? $gross / (1 + $vatPct / 100) : $gross;
+    $lines[] = ['label' => ($pay['description'] ?: 'LiveGig'), 'amount' => $net];
+}
 $vatAmt = $gross - $net;
 
 $paidDate = $valid ? ($pay['paid_at'] ?: $pay['created_at']) : '';
@@ -147,10 +171,12 @@ $cur      = $valid ? ($pay['currency'] ?: 'EUR') : 'EUR';
                 <tr><th>Omschrijving</th><th class="num">Bedrag</th></tr>
             </thead>
             <tbody>
+                <?php foreach ($lines as $ln): ?>
                 <tr>
-                    <td><?= htmlspecialchars($pay['description'] ?: 'LiveGig abonnement') ?></td>
-                    <td class="num"><?= fmtEur($vatPct > 0 ? $net : $gross) ?></td>
+                    <td><?= htmlspecialchars($ln['label']) ?></td>
+                    <td class="num"><?= fmtEur($ln['amount']) ?></td>
                 </tr>
+                <?php endforeach; ?>
             </tbody>
         </table>
 

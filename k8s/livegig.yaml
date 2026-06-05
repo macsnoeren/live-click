@@ -1,0 +1,152 @@
+# Kubernetes-manifest voor live-click (LiveGig).
+#
+# ⚠ BELANGRIJK: de app gebruikt SQLite op één ReadWriteOnce-volume. Draai daarom
+#   met PRECIES ÉÉN replica. Horizontaal schalen (>1 pod) corrumpeert de database.
+#   Daarom: replicas=1 en strategy=Recreate (een RWO-volume kan niet door twee
+#   pods tegelijk worden gemount).
+#
+# Pas aan: image-registry, storageClassName, het domein in de Mollie-URL's, de
+# tokens, en voeg een eigen Ingress + TLS toe (de Mollie-webhook moet publiek
+# bereikbaar zijn op https). Zorg dat de Ingress 'X-Forwarded-Proto: https'
+# doorgeeft, dan zet de app de sessiecookies veilig en stuurt 'ie HSTS.
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: livegig-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+  # storageClassName: standard   # zet je eigen StorageClass
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: livegig-secrets
+type: Opaque
+stringData:
+  # Laat leeg wat je (nog) niet gebruikt.
+  LIVEGIG_MOLLIE_API_KEY: ""
+  LIVEGIG_MOLLIE_REDIRECT_URL: "https://app.example.nl/live-click/betaling.php"
+  LIVEGIG_MOLLIE_WEBHOOK_URL: "https://app.example.nl/live-click/api/mollie_webhook.php"
+  LIVEGIG_SPOTIFY_CLIENT_ID: ""
+  LIVEGIG_SPOTIFY_CLIENT_SECRET: ""
+  LIVEGIG_GETSONGBPM_API_KEY: ""
+  # Token waarmee de dagelijkse CronJob api/cron.php mag aanroepen.
+  LIVEGIG_CRON_TOKEN: "vervang-door-een-lange-willekeurige-string"
+  # Factuurgegevens (komen op de downloadbare factuur).
+  LIVEGIG_INVOICE_COMPANY_NAME: "LiveGig"
+  LIVEGIG_INVOICE_COMPANY_ADDRESS: ""
+  LIVEGIG_INVOICE_COMPANY_KVK: ""
+  LIVEGIG_INVOICE_COMPANY_VATID: ""
+  LIVEGIG_INVOICE_COMPANY_EMAIL: ""
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livegig
+  labels:
+    app: livegig
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: livegig
+  template:
+    metadata:
+      labels:
+        app: livegig
+    spec:
+      securityContext:
+        fsGroup: 33            # www-data → maakt het gemounte volume schrijfbaar
+      containers:
+        - name: livegig
+          image: REGISTRY/livegig:latest    # <-- vervang door je eigen image
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          envFrom:
+            - secretRef:
+                name: livegig-secrets
+          env:
+            # Paywall pas afdwingen als je live gaat én bestaande leiders zijn vrijgesteld.
+            - name: LIVEGIG_MOLLIE_BILLING_ENFORCED
+              value: "0"
+            - name: LIVEGIG_STORAGE_QUOTA_MB
+              value: "500"
+          volumeMounts:
+            - name: data
+              mountPath: /var/www/html/data
+          readinessProbe:
+            httpGet:
+              path: /login.php
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /login.php
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: livegig-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: livegig
+  labels:
+    app: livegig
+spec:
+  selector:
+    app: livegig
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+
+---
+# Dagelijkse tariefverwerking: past een ingegane prijswijziging toe op lopende
+# Mollie-abonnementen (geldt vanaf hun volgende verlenging).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: livegig-cron
+spec:
+  schedule: "30 3 * * *"        # elke dag om 03:30
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: cron
+              image: curlimages/curl:8.8.0
+              env:
+                - name: CRON_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: livegig-secrets
+                      key: LIVEGIG_CRON_TOKEN
+              command: ["sh", "-c"]
+              args:
+                - 'curl -fsS "http://livegig/api/cron.php?token=${CRON_TOKEN}" && echo'

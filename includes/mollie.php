@@ -134,10 +134,10 @@ function mollieCreateFirstPayment(string $customerId, int $userId): array {
  *
  * @param ?string $startDate YYYY-MM-DD; null = direct starten (geen proef meer).
  */
-function mollieCreateSubscription(string $customerId, int $userId, ?string $startDate): array {
+function mollieCreateSubscription(string $customerId, int $userId, ?string $startDate, string $amount, string $interval): array {
     $body = [
-        'amount'      => ['currency' => 'EUR', 'value' => (string)MOLLIE_SUBSCRIPTION_AMOUNT],
-        'interval'    => MOLLIE_SUBSCRIPTION_INTERVAL,
+        'amount'      => ['currency' => 'EUR', 'value' => number_format((float)$amount, 2, '.', '')],
+        'interval'    => $interval,
         // Beschrijving moet uniek zijn per customer-abonnement bij Mollie.
         'description' => MOLLIE_SUBSCRIPTION_DESCRIPTION . ' #' . $userId . '-' . time(),
         'webhookUrl'  => MOLLIE_WEBHOOK_URL,
@@ -147,6 +147,18 @@ function mollieCreateSubscription(string $customerId, int $userId, ?string $star
         $body['startDate'] = $startDate;
     }
     return mollieRequest('POST', '/customers/' . rawurlencode($customerId) . '/subscriptions', $body);
+}
+
+/**
+ * Wijzig het bedrag van een lopend Mollie-abonnement. De nieuwe prijs geldt
+ * vanaf de eerstvolgende incasso (gebruikt door de cron bij een tariefwijziging).
+ */
+function mollieUpdateSubscriptionAmount(string $customerId, string $subscriptionId, string $amount): array {
+    return mollieRequest(
+        'PATCH',
+        '/customers/' . rawurlencode($customerId) . '/subscriptions/' . rawurlencode($subscriptionId),
+        ['amount' => ['currency' => 'EUR', 'value' => number_format((float)$amount, 2, '.', '')]]
+    );
 }
 
 /** Haal een betaling op (gebruikt door de webhook). */

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/mollie.php';
+require_once APP_ROOT . '/includes/pricing.php';
 requireLogin();
 csrfRequire();
 header('Content-Type: application/json');
@@ -177,7 +178,8 @@ if ($method === 'POST') {
             $future    = $endsAt && strtotime($endsAt) > time();
             $startDate = $future ? date('Y-m-d', strtotime($endsAt)) : null;
             try {
-                $created    = mollieCreateSubscription($sub['mollie_customer_id'], $userId, $startDate);
+                $created    = mollieCreateSubscription($sub['mollie_customer_id'], $userId, $startDate,
+                                  (string)$sub['amount'], (string)$sub['interval']);
                 // Loopt de proef nog? Dan blijft de status 'trialing' tot die afloopt.
                 $stillTrial = $future && !empty($sub['trial_ends_at']) && $endsAt === $sub['trial_ends_at'];
                 $newStatus  = $stillTrial ? 'trialing' : 'active';
@@ -235,20 +237,28 @@ if ($method === 'POST') {
             exit;
         }
 
+        // Huidig tarief bepalen en als snapshot meenemen.
+        $pricing  = currentPricing();
+        $amount   = pricingTotal($pricing);
+        $interval = $pricing['interval'];
+
         // Lokale subscription-rij aanmaken/bijwerken naar 'pending'.
         if ($sub) {
             $db->prepare(
                 "UPDATE subscriptions
                     SET mollie_customer_id=?, status='pending', amount=?, currency='EUR',
-                        interval=?, canceled_at=NULL
+                        interval=?, base_amount=?, mollie_fee=?, vat_percent=?, canceled_at=NULL
                   WHERE id=?"
-            )->execute([$customerId, MOLLIE_SUBSCRIPTION_AMOUNT, MOLLIE_SUBSCRIPTION_INTERVAL, $sub['id']]);
+            )->execute([$customerId, $amount, $interval,
+                        $pricing['base_amount'], $pricing['mollie_fee'], $pricing['vat_percent'], $sub['id']]);
             $subId = (int)$sub['id'];
         } else {
             $db->prepare(
-                "INSERT INTO subscriptions (user_id, mollie_customer_id, status, amount, currency, interval)
-                 VALUES (?, ?, 'pending', ?, 'EUR', ?)"
-            )->execute([$userId, $customerId, MOLLIE_SUBSCRIPTION_AMOUNT, MOLLIE_SUBSCRIPTION_INTERVAL]);
+                "INSERT INTO subscriptions
+                    (user_id, mollie_customer_id, status, amount, currency, interval, base_amount, mollie_fee, vat_percent)
+                 VALUES (?, ?, 'pending', ?, 'EUR', ?, ?, ?, ?)"
+            )->execute([$userId, $customerId, $amount, $interval,
+                        $pricing['base_amount'], $pricing['mollie_fee'], $pricing['vat_percent']]);
             $subId = (int)$db->lastInsertId();
         }
 

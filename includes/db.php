@@ -186,6 +186,21 @@ function initSchema(PDO $db): void {
             FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL
         );
         CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at);
+
+        -- Tariefversies met ingangsdatum. De prijs is opgebouwd uit componenten:
+        --   totaal = round((base_amount + mollie_fee) * (1 + vat_percent/100), 2)
+        -- Het 'huidige' tarief is de versie met de hoogste effective_from <= vandaag;
+        -- versies met een toekomstige datum staan gepland.
+        CREATE TABLE IF NOT EXISTS pricing (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            interval TEXT NOT NULL DEFAULT '12 months',
+            base_amount REAL NOT NULL DEFAULT 0,
+            mollie_fee REAL NOT NULL DEFAULT 0,
+            vat_percent REAL NOT NULL DEFAULT 21,
+            effective_from DATE NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_pricing_effective ON pricing(effective_from);
     ");
 
     // Add columns introduced after initial schema (safe to run on existing DBs)
@@ -234,6 +249,11 @@ function initSchema(PDO $db): void {
     // Bij opzeggen: tot wanneer de toegang nog geldig blijft (einde proef of einde
     // betaalde maand). Daarna vervalt het abonnement. NULL = niet opgezegd.
     try { $db->exec('ALTER TABLE subscriptions ADD COLUMN ends_at DATETIME'); } catch (PDOException $e) {}
+    // Prijsopbouw-snapshot per abonnement (zodat factuur/uitsplitsing klopt, ook
+    // als het tarief later wijzigt). amount blijft het totaal dat geïncasseerd wordt.
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN base_amount REAL'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN mollie_fee REAL'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN vat_percent REAL'); } catch (PDOException $e) {}
 
     // E2EE-kluis per band (zie PRIVACY.md, fase 2).
     //   is_encrypted — staat de kluis aan voor deze band?
@@ -302,4 +322,16 @@ function initSchema(PDO $db): void {
         $db->prepare("INSERT INTO users (username, email, password_hash, role, must_change_password) VALUES (?, ?, ?, 'admin', 1)")
            ->execute(['admin', 'admin@livegig.local', $hash]);
     }
+
+    // Standaardtarief seeden als er nog geen is: jaarabonnement €5 basis +
+    // €0,35 Mollie-kosten + 21% btw. De admin past dit aan onder Tarieven.
+    try {
+        $hasPricing = (int)$db->query('SELECT COUNT(*) FROM pricing')->fetchColumn();
+        if ($hasPricing === 0) {
+            $db->prepare(
+                "INSERT INTO pricing (interval, base_amount, mollie_fee, vat_percent, effective_from)
+                 VALUES ('12 months', 5.00, 0.35, 21, date('now'))"
+            )->execute();
+        }
+    } catch (PDOException $e) { /* tabel bestaat nog niet tijdens initial install */ }
 }

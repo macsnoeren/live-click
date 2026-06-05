@@ -14,6 +14,7 @@ require APP_ROOT . '/includes/header.php';
         <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-users">Gebruikers</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-bands">Bands</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-payments">Betalingen</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-pricing">Tarieven</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-discounts">Kortingscodes</a></li>
     </ul>
 
@@ -92,6 +93,31 @@ require APP_ROOT . '/includes/header.php';
                 <table class="table table-dark table-hover table-sm mb-0">
                     <thead><tr><th>Datum</th><th>Gebruiker</th><th>Omschrijving</th><th>Bedrag</th><th>Status</th></tr></thead>
                     <tbody id="payments-tbody"><tr><td colspan="5" class="text-muted">Laden...</td></tr></tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRICING TAB -->
+        <div class="tab-pane fade" id="tab-pricing">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Tarieven</h5>
+                <button class="btn btn-danger btn-sm" onclick="openAddPricing()">
+                    <i class="bi bi-plus-lg"></i> Tarief toevoegen
+                </button>
+            </div>
+            <p class="text-muted small">
+                Het abonnement is een <strong>jaarabonnement</strong>. De prijs is opgebouwd uit
+                basisbedrag + Mollie-transactiekosten + btw. Een nieuw tarief met ingangsdatum geldt
+                voor nieuwe abonnementen én — via de dagelijkse tariefverwerking — voor bestaande
+                abonnees bij hun volgende verlenging.
+            </p>
+            <div id="pricing-current" class="mb-3"></div>
+            <div class="card">
+                <div class="table-responsive">
+                <table class="table table-dark table-hover table-sm mb-0 align-middle">
+                    <thead><tr><th>Ingangsdatum</th><th>Interval</th><th class="text-end">Basis</th><th class="text-end">Mollie</th><th class="text-end">Btw</th><th class="text-end">Totaal</th><th>Status</th><th></th></tr></thead>
+                    <tbody id="pricing-tbody"><tr><td colspan="8" class="text-muted">Laden...</td></tr></tbody>
                 </table>
                 </div>
             </div>
@@ -213,6 +239,52 @@ require APP_ROOT . '/includes/header.php';
     </div>
 </div>
 
+<!-- Pricing Modal -->
+<div class="modal fade" id="pricingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Tarief toevoegen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Basisbedrag (€)</label>
+                        <input type="number" id="pr-base" class="form-control" min="0" step="0.01" value="5.00" oninput="updatePrPreview()">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Mollie-kosten (€)</label>
+                        <input type="number" id="pr-fee" class="form-control" min="0" step="0.01" value="0.35" oninput="updatePrPreview()">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Btw (%)</label>
+                        <input type="number" id="pr-vat" class="form-control" min="0" step="0.1" value="21" oninput="updatePrPreview()">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Ingangsdatum</label>
+                        <input type="date" id="pr-eff" class="form-control">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Interval</label>
+                    <select id="pr-interval" class="form-select">
+                        <option value="12 months" selected>Jaarlijks (12 months)</option>
+                        <option value="1 month">Maandelijks (1 month)</option>
+                    </select>
+                </div>
+                <div class="alert alert-secondary py-2 small mb-0">
+                    Totaal dat de klant betaalt: <strong id="pr-preview">—</strong>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
+                <button class="btn btn-danger" onclick="savePricing()">Opslaan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Discount Modal -->
 <div class="modal fade" id="discountModal" tabindex="-1">
     <div class="modal-dialog">
@@ -308,6 +380,7 @@ $(function() {
     loadBands();
     // Betalingen/kortingen pas laden zodra het bijbehorende tabblad wordt geopend.
     $(\'a[href="#tab-payments"]\').on("shown.bs.tab", loadPayments);
+    $(\'a[href="#tab-pricing"]\').on("shown.bs.tab", loadPricing);
     $(\'a[href="#tab-discounts"]\').on("shown.bs.tab", loadDiscounts);
 });
 
@@ -516,6 +589,78 @@ function renderPaymentsList(pays) {
             + \'<td>\' + statusBadge(PAY_STATUS, p.status) + \'</td>\'
             + \'</tr>\');
     });
+}
+
+// ── Tarieven ─────────────────────────────────────────────────────────────────
+function prMoney(v) { return "€ " + Number(v).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function loadPricing() {
+    $.get("api/pricing.php", function(d) { if (d.ok) renderPricing(d.pricing || []); });
+}
+
+function renderPricing(rows) {
+    var cur = rows.find(function(r){ return r.is_current; });
+    $("#pricing-current").html(cur
+        ? \'<div class="alert alert-success py-2 mb-0">Huidig tarief: <strong>\' + prMoney(cur.total) + \'</strong> per \' + escHtml(cur.interval)
+          + \' &middot; basis \' + prMoney(cur.base_amount) + \' + Mollie \' + prMoney(cur.mollie_fee) + \' + \' + escHtml(String(cur.vat_percent)) + \'% btw</div>\'
+        : \'<div class="alert alert-warning py-2 mb-0">Geen actief tarief.</div>\');
+    var tb = $("#pricing-tbody"); tb.empty();
+    if (!rows.length) { tb.append(\'<tr><td colspan="8" class="text-muted">Nog geen tarieven</td></tr>\'); return; }
+    rows.forEach(function(r) {
+        var status = r.is_current ? \'<span class="badge bg-success">Huidig</span>\'
+            : (r.is_scheduled ? \'<span class="badge bg-info text-dark">Gepland</span>\' : \'<span class="badge bg-secondary">Verlopen</span>\');
+        var del = r.is_scheduled
+            ? \'<button class="btn btn-xs btn-outline-danger" onclick="askDeletePricing(\' + r.id + \')" title="Verwijderen"><i class="bi bi-trash"></i></button>\'
+            : \'\';
+        tb.append(\'<tr>\'
+            + \'<td>\' + escHtml(r.effective_from) + \'</td>\'
+            + \'<td class="text-muted small">\' + escHtml(r.interval) + \'</td>\'
+            + \'<td class="text-end">\' + prMoney(r.base_amount) + \'</td>\'
+            + \'<td class="text-end">\' + prMoney(r.mollie_fee) + \'</td>\'
+            + \'<td class="text-end">\' + escHtml(String(r.vat_percent)) + \'%</td>\'
+            + \'<td class="text-end fw-semibold">\' + prMoney(r.total) + \'</td>\'
+            + \'<td>\' + status + \'</td>\'
+            + \'<td>\' + del + \'</td>\'
+            + \'</tr>\');
+    });
+}
+
+function updatePrPreview() {
+    var b = parseFloat($("#pr-base").val()) || 0,
+        f = parseFloat($("#pr-fee").val()) || 0,
+        v = parseFloat($("#pr-vat").val()) || 0;
+    $("#pr-preview").text(prMoney(Math.round((b + f) * (1 + v / 100) * 100) / 100));
+}
+
+function openAddPricing() {
+    $("#pr-base").val("5.00"); $("#pr-fee").val("0.35"); $("#pr-vat").val("21");
+    $("#pr-interval").val("12 months");
+    $("#pr-eff").val(new Date().toISOString().substring(0, 10));
+    updatePrPreview();
+    new bootstrap.Modal("#pricingModal").show();
+}
+
+function savePricing() {
+    var data = {
+        base_amount: $("#pr-base").val(), mollie_fee: $("#pr-fee").val(),
+        vat_percent: $("#pr-vat").val(), interval: $("#pr-interval").val(),
+        effective_from: $("#pr-eff").val()
+    };
+    if (!(parseFloat(data.base_amount) > 0)) { alert("Basisbedrag moet groter dan 0 zijn."); return; }
+    if (!data.effective_from) { alert("Kies een ingangsdatum."); return; }
+    $.post("api/pricing.php", JSON.stringify(data), function(r) {
+        if (r.ok) { bootstrap.Modal.getInstance("#pricingModal").hide(); loadPricing(); }
+        else alert(r.error || "Fout");
+    }, "json");
+}
+
+var _delPrId = null;
+function askDeletePricing(id) {
+    _delPrId = id;
+    if (!confirm("Dit geplande tarief verwijderen?")) return;
+    $.ajax({ url: "api/pricing.php", type: "DELETE", contentType: "application/json",
+        data: JSON.stringify({ id: _delPrId }), dataType: "json",
+        success: function(r) { if (r.ok) loadPricing(); else alert(r.error || "Verwijderen mislukt"); } });
 }
 
 // ── Kortingscodes ────────────────────────────────────────────────────────────
