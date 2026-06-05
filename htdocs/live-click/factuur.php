@@ -102,7 +102,6 @@ $cur      = $valid ? ($pay['currency'] ?: 'EUR') : 'EUR';
 <?php else: ?>
 
     <div class="actions">
-        <a class="btn secondary" href="subscribe.php">← Terug</a>
         <a class="btn" href="#" onclick="window.print();return false;">Download / print (PDF)</a>
     </div>
 
