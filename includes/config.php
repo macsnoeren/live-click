@@ -58,6 +58,30 @@ if (!defined('MOLLIE_SUBSCRIPTION_DESCRIPTION')) {
 if (!defined('MOLLIE_TRIAL_DAYS')) {
     define('MOLLIE_TRIAL_DAYS', (int)(getenv('LIVEGIG_MOLLIE_TRIAL_DAYS') ?: 30));
 }
+// ── Facturatie-gegevens (voor de downloadbare factuur) ──────────────────────
+// Vul je eigen bedrijfsgegevens in via env-vars of config.local.php.
+if (!defined('INVOICE_COMPANY_NAME')) {
+    define('INVOICE_COMPANY_NAME', getenv('LIVEGIG_INVOICE_COMPANY_NAME') ?: 'LiveGig');
+}
+if (!defined('INVOICE_COMPANY_ADDRESS')) {
+    // Meerdere regels mogen met "\n" gescheiden worden.
+    define('INVOICE_COMPANY_ADDRESS', getenv('LIVEGIG_INVOICE_COMPANY_ADDRESS') ?: '');
+}
+if (!defined('INVOICE_COMPANY_KVK')) {
+    define('INVOICE_COMPANY_KVK', getenv('LIVEGIG_INVOICE_COMPANY_KVK') ?: '');
+}
+if (!defined('INVOICE_COMPANY_VATID')) {
+    define('INVOICE_COMPANY_VATID', getenv('LIVEGIG_INVOICE_COMPANY_VATID') ?: '');
+}
+if (!defined('INVOICE_COMPANY_EMAIL')) {
+    define('INVOICE_COMPANY_EMAIL', getenv('LIVEGIG_INVOICE_COMPANY_EMAIL') ?: '');
+}
+// BTW-percentage waarmee het betaalde (inclusief) bedrag wordt uitgesplitst.
+// Zet op 0 als je geen btw in rekening brengt (bv. KOR-regeling).
+if (!defined('INVOICE_VAT_PERCENT')) {
+    define('INVOICE_VAT_PERCENT', (float)(getenv('LIVEGIG_INVOICE_VAT_PERCENT') ?: 21));
+}
+
 // Bedrag van de eenmalige "first payment" die alleen het incassomandaat vestigt.
 // iDEAL staat geen €0,00 toe; een minimaal bedrag volstaat om de machtiging te krijgen.
 if (!defined('MOLLIE_MANDATE_AMOUNT')) {

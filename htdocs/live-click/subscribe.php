@@ -111,7 +111,11 @@ function loadInvoices() {
                     + (p.mollie_payment_id ? "<div class=\"text-muted\" style=\"font-size:0.7rem\">" + escHtml(p.mollie_payment_id) + "</div>" : "")
                 + "</td>"
                 + "<td class=\"text-end text-nowrap\">" + invMoney(p.amount, p.currency) + "</td>"
-                + "<td>" + invStatus(p.status) + "</td>"
+                + "<td class=\"text-nowrap\">" + invStatus(p.status)
+                    + (p.status === "paid"
+                        ? " <a href=\"factuur.php?payment_id=" + p.id + "\" target=\"_blank\" rel=\"noopener\" class=\"ms-1\" title=\"Factuur downloaden\"><i class=\"bi bi-download\"></i></a>"
+                        : "")
+                + "</td>"
                 + "</tr>");
         });
     });
