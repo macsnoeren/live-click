@@ -116,6 +116,17 @@ if ($method === 'GET' && ($_GET['debug'] ?? '') === 'sub') {
     exit;
 }
 
+/* ---- GET: facturen/betalingen van de huidige gebruiker ---- */
+if ($method === 'GET' && ($_GET['invoices'] ?? '') === '1') {
+    $rows = $db->prepare(
+        "SELECT id, mollie_payment_id, amount, currency, status, description, paid_at, created_at
+           FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 50"
+    );
+    $rows->execute([$userId]);
+    echo json_encode(['ok' => true, 'invoices' => $rows->fetchAll()]);
+    exit;
+}
+
 /* ---- GET: huidige abonnementsstatus ---- */
 if ($method === 'GET') {
     $sub = getUserSubscription($userId);

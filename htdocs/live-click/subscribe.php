@@ -49,6 +49,19 @@ require APP_ROOT . '/includes/header.php';
         </div>
     </div>
 
+    <!-- Facturen / kostenoverzicht -->
+    <div class="card mt-4">
+        <div class="card-header"><i class="bi bi-receipt me-2"></i>Facturen</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-dark table-sm mb-0 align-middle">
+                    <thead><tr><th>Datum</th><th>Omschrijving</th><th class="text-end">Bedrag</th><th>Status</th></tr></thead>
+                    <tbody id="invoices-tbody"><tr><td colspan="4" class="text-muted small">Laden…</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <p class="text-muted small mt-3">
         <i class="bi bi-shield-lock me-1"></i>
         Betalen verloopt veilig via Mollie (iDEAL, creditcard). Bij het starten
@@ -61,7 +74,48 @@ require APP_ROOT . '/includes/header.php';
 
 <?php
 $extraScripts = '<script>
-$(function() { loadSubStatus(); });
+$(function() { loadSubStatus(); loadInvoices(); });
+
+var INV_LABEL = {
+    paid:    ["success", "Betaald"],
+    open:    ["secondary", "Open"],
+    pending: ["secondary", "In behandeling"],
+    failed:  ["danger", "Mislukt"],
+    canceled:["secondary", "Geannuleerd"],
+    expired: ["secondary", "Verlopen"],
+    refunded:["warning text-dark", "Terugbetaald"]
+};
+
+function invMoney(a, c) {
+    try { return Number(a).toLocaleString("nl-NL", { style: "currency", currency: c || "EUR" }); }
+    catch (e) { return (c || "EUR") + " " + Number(a).toFixed(2); }
+}
+
+function invStatus(s) {
+    var x = INV_LABEL[s] || ["secondary", s || "—"];
+    return "<span class=\"badge bg-" + x[0] + "\">" + escHtml(x[1]) + "</span>";
+}
+
+function loadInvoices() {
+    $.get("api/subscribe.php?invoices=1", function(r) {
+        var tb = $("#invoices-tbody"); tb.empty();
+        if (!r.ok || !r.invoices || !r.invoices.length) {
+            tb.append("<tr><td colspan=\"4\" class=\"text-muted small\">Nog geen facturen.</td></tr>");
+            return;
+        }
+        r.invoices.forEach(function(p) {
+            var d = String(p.paid_at || p.created_at || "").substring(0, 10);
+            tb.append("<tr>"
+                + "<td class=\"small text-nowrap\">" + escHtml(d) + "</td>"
+                + "<td class=\"small\">" + escHtml(p.description || "")
+                    + (p.mollie_payment_id ? "<div class=\"text-muted\" style=\"font-size:0.7rem\">" + escHtml(p.mollie_payment_id) + "</div>" : "")
+                + "</td>"
+                + "<td class=\"text-end text-nowrap\">" + invMoney(p.amount, p.currency) + "</td>"
+                + "<td>" + invStatus(p.status) + "</td>"
+                + "</tr>");
+        });
+    });
+}
 
 var SUB_LABEL = {
     pending:  ["secondary", "Nog niet actief"],
