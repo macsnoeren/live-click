@@ -143,6 +143,13 @@ var SUB_LABEL = {
     canceled: ["secondary", "Opgezegd"]
 };
 
+function intervalNL(iv) {
+    if (iv === "12 months" || iv === "1 year") return "jaar";
+    if (iv === "1 month") return "maand";
+    return iv;
+}
+function dateOnly(s) { return String(s || "").substring(0, 10); }
+
 function loadSubStatus() {
     $.get("api/subscribe.php", function(d) {
         if (!d.ok) { $("#sub-status").text(d.error || "Kon status niet laden."); return; }
@@ -173,8 +180,8 @@ function loadSubStatus() {
 
         var lbl = SUB_LABEL[sub.status] || ["secondary", sub.status];
         var extra = "";
-        if (sub.status === "trialing" && sub.trial_ends_at)  extra = "<div class=\"small text-muted mt-2\">Proef loopt tot " + escHtml(sub.trial_ends_at) + ". Daarna " + escHtml(sub.amount) + " " + escHtml(sub.currency) + " per " + escHtml(sub.interval) + ".</div>";
-        if (sub.status === "active" && sub.next_payment_at) extra = "<div class=\"small text-muted mt-2\">Volgende incasso: " + escHtml(sub.next_payment_at) + ".</div>";
+        if (sub.status === "trialing" && sub.trial_ends_at)  extra = "<div class=\"small text-muted mt-2\">Proef loopt tot " + escHtml(dateOnly(sub.trial_ends_at)) + ". Daarna " + invMoney(sub.amount, sub.currency) + " per " + intervalNL(sub.interval) + ".</div>";
+        if (sub.status === "active" && sub.next_payment_at) extra = "<div class=\"small text-muted mt-2\">Volgende incasso: " + escHtml(dateOnly(sub.next_payment_at)) + ".</div>";
         if (sub.status === "suspended") extra = "<div class=\"small text-warning mt-2\">De laatste incasso mislukte. Je bands zijn geblokkeerd tot de betaling lukt.</div>";
         statusEl.html("<span class=\"badge bg-" + lbl[0] + "\">" + escHtml(lbl[1]) + "</span>" + extra);
 

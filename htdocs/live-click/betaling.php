@@ -98,7 +98,7 @@ $csrf = csrfToken();
         if (sub && sub.status === "trialing") {
             title.textContent = "Je proefperiode is gestart";
             text.textContent  = sub.trial_ends_at
-                ? "Gratis tot " + sub.trial_ends_at + ". Daarna wordt automatisch geïncasseerd. Je kunt altijd opzeggen."
+                ? "Gratis tot " + String(sub.trial_ends_at).substring(0, 10) + ". Daarna wordt automatisch geïncasseerd. Je kunt altijd opzeggen."
                 : "Je gratis proefperiode loopt. Je kunt nu een band aanmaken.";
         } else {
             title.textContent = "Je abonnement is actief";
