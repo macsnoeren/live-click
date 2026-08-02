@@ -41,8 +41,9 @@ require APP_ROOT . '/includes/header.php';
                     </select>
                     <span id="sl-dash-dur" class="badge bg-secondary" style="display:none"></span>
                 </div>
+                <!-- BUG FIX: autocomplete="new-password" because the search form was continuosly filled-in by a password manager. -->
                 <input type="search" id="dash-search" class="form-control form-control-sm mt-2"
-                       placeholder="Zoek nummer..." autocomplete="off"
+                       placeholder="Zoek nummer..." autocomplete="new-password"
                        autocorrect="off" autocapitalize="off" spellcheck="false"
                        name="dash-search-nofill"
                        data-1p-ignore data-lpignore="true" data-form-type="other" data-bwignore>
