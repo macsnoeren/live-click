@@ -17,8 +17,9 @@ require APP_ROOT . '/includes/header.php';
             <?php endif; ?>
         </h4>
         <div class="d-flex gap-2">
+            <!-- BUG FIX: autocomplete="new-password" because the search form was continuosly filled-in by a password manager. -->
             <input type="search" id="song-filter" class="form-control form-control-sm" placeholder="Zoeken..." style="width:200px"
-                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="song-filter-nofill"
+                   autocomplete="off" autocorrect="new-password" autocapitalize="off" spellcheck="false" name="song-filter-nofill"
                    data-1p-ignore data-lpignore="true" data-form-type="other" data-bwignore>
             <?php if ($canEdit): ?>
             <button class="btn btn-outline-secondary btn-sm" onclick="openImport()" title="Nummers importeren uit een andere band">
