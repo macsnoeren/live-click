@@ -11,6 +11,7 @@ require_once __DIR__ . '/bootstrap.php';
 
 if (!$cli) {
     require_once APP_ROOT . '/includes/auth.php';
+    require_once APP_ROOT . '/includes/storage.php';
     requireAdmin();
     $user = currentUser();
 } else {
@@ -133,6 +134,7 @@ if ($cli) {
 
 $imported = null;
 $skipped  = null;
+$quotaBlocked = 0;
 $postErrors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$parseError) {
@@ -158,6 +160,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$parseError) {
     $imported = 0;
     $skipped  = 0;
 
+    // Fair-use: bepaal de eigenaar (leider) van de doelband en de resterende
+    // ruimte. Zonder band (orphan-import) of leider geldt geen quotum.
+    $ownerId   = $bandId ? bandStorageOwnerId($bandId) : null;
+    $remaining = PHP_INT_MAX;
+    if ($ownerId !== null) {
+        $u = userStorageUsage($ownerId);
+        $remaining = $u['quota_bytes'] - $u['used_bytes'];
+    }
+
     foreach ($songs as $s) {
         $params = [$s['title'], $s['artist']];
         if ($bandId) $params[] = $bandId;
@@ -172,7 +183,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$parseError) {
                 $skipped++;
             }
         } else {
+            // Nieuw nummer telt mee voor het opslagquotum (titel+artiest+omschrijving,
+            // dezelfde kolommen als de fair-use-meting). Past het niet meer, dan
+            // sla we het over en melden we dat na afloop.
+            $songBytes = strlen($s['title']) + strlen($s['artist']) + strlen((string)($s['desc'] ?? ''));
+            if ($songBytes > $remaining) { $quotaBlocked++; continue; }
             $insertStmt->execute([$s['title'], $s['artist'], $s['bpm'], $s['dur'], $s['starts'] ?: null, $s['desc'] ?: null, $bandId, $user['id']]);
+            $remaining -= $songBytes;
             $imported++;
         }
     }
@@ -204,6 +221,14 @@ require APP_ROOT . '/includes/header.php';
         <strong><?= $imported ?></strong> nummer(s) geïmporteerd<?php if ($skipped): ?>,
         <strong><?= $skipped ?></strong> overgeslagen (bestonden al)<?php endif; ?>.
         <a href="songs.php" class="ms-3 btn btn-sm btn-outline-success">→ Repertoire</a>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($quotaBlocked): ?>
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        <strong><?= $quotaBlocked ?></strong> nummer(s) zijn <strong>niet</strong> geïmporteerd: de
+        opslaglimiet (fair-use) van de bandleider is bereikt. Maak ruimte vrij en probeer het opnieuw.
     </div>
     <?php endif; ?>
 

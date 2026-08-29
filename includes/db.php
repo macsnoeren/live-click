@@ -125,6 +125,82 @@ function initSchema(PDO $db): void {
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_backup_user ON totp_backup_codes(user_id);
+
+        -- ── Facturatie / abonnementen (Mollie) ──────────────────────────────
+        -- Kortingscodes worden in de app zelf beheerd: Mollie kent géén
+        -- ingebouwd couponsysteem, dus de kortinglogica leeft hier.
+        --   type     'percent' (value = 0-100) of 'fixed' (value = bedrag in EUR)
+        --   duration 'once' (alleen eerste incasso) of 'forever' (hele looptijd)
+        CREATE TABLE IF NOT EXISTS discount_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL UNIQUE,
+            type TEXT NOT NULL DEFAULT 'percent',
+            value REAL NOT NULL DEFAULT 0,
+            description TEXT,
+            duration TEXT NOT NULL DEFAULT 'once',
+            max_redemptions INTEGER,
+            times_redeemed INTEGER NOT NULL DEFAULT 0,
+            valid_until DATETIME,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Eén abonnement per gebruiker. De Mollie-id's blijven NULL tot de
+        -- betaalflow (first payment + subscription) is doorlopen.
+        --   status  pending|trialing|active|canceled|suspended
+        CREATE TABLE IF NOT EXISTS subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            mollie_customer_id TEXT,
+            mollie_subscription_id TEXT,
+            mollie_mandate_id TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            amount REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT 'EUR',
+            interval TEXT NOT NULL DEFAULT '1 month',
+            discount_code_id INTEGER,
+            trial_ends_at DATETIME,
+            next_payment_at DATETIME,
+            started_at DATETIME,
+            canceled_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (discount_code_id) REFERENCES discount_codes(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+
+        -- Losse afschrijvingen. Wordt gevuld door de Mollie-webhook.
+        --   status  open|pending|paid|failed|canceled|expired|refunded
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            subscription_id INTEGER,
+            mollie_payment_id TEXT UNIQUE,
+            amount REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT 'EUR',
+            status TEXT NOT NULL DEFAULT 'open',
+            description TEXT,
+            paid_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+            FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at);
+
+        -- Tariefversies met ingangsdatum. De prijs is opgebouwd uit componenten:
+        --   totaal = round((base_amount + mollie_fee) * (1 + vat_percent/100), 2)
+        -- Het 'huidige' tarief is de versie met de hoogste effective_from <= vandaag;
+        -- versies met een toekomstige datum staan gepland.
+        CREATE TABLE IF NOT EXISTS pricing (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            interval TEXT NOT NULL DEFAULT '12 months',
+            base_amount REAL NOT NULL DEFAULT 0,
+            mollie_fee REAL NOT NULL DEFAULT 0,
+            vat_percent REAL NOT NULL DEFAULT 21,
+            effective_from DATE NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_pricing_effective ON pricing(effective_from);
     ");
 
     // Add columns introduced after initial schema (safe to run on existing DBs)
@@ -166,6 +242,18 @@ function initSchema(PDO $db): void {
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_secret TEXT'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
     try { $db->exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
+
+    // Facturatie: is de eenmalige gratis proefmaand al verbruikt door deze
+    // gebruiker? Voorkomt een nieuwe proef bij een latere leiderschapsovername.
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN trial_used INTEGER NOT NULL DEFAULT 0'); } catch (PDOException $e) {}
+    // Bij opzeggen: tot wanneer de toegang nog geldig blijft (einde proef of einde
+    // betaalde maand). Daarna vervalt het abonnement. NULL = niet opgezegd.
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN ends_at DATETIME'); } catch (PDOException $e) {}
+    // Prijsopbouw-snapshot per abonnement (zodat factuur/uitsplitsing klopt, ook
+    // als het tarief later wijzigt). amount blijft het totaal dat geïncasseerd wordt.
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN base_amount REAL'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN mollie_fee REAL'); } catch (PDOException $e) {}
+    try { $db->exec('ALTER TABLE subscriptions ADD COLUMN vat_percent REAL'); } catch (PDOException $e) {}
 
     // E2EE-kluis per band (zie PRIVACY.md, fase 2).
     //   is_encrypted — staat de kluis aan voor deze band?
@@ -234,4 +322,16 @@ function initSchema(PDO $db): void {
         $db->prepare("INSERT INTO users (username, email, password_hash, role, must_change_password) VALUES (?, ?, ?, 'admin', 1)")
            ->execute(['admin', 'admin@livegig.local', $hash]);
     }
+
+    // Standaardtarief seeden als er nog geen is: jaarabonnement €5 basis +
+    // €0,35 Mollie-kosten + 21% btw. De admin past dit aan onder Tarieven.
+    try {
+        $hasPricing = (int)$db->query('SELECT COUNT(*) FROM pricing')->fetchColumn();
+        if ($hasPricing === 0) {
+            $db->prepare(
+                "INSERT INTO pricing (interval, base_amount, mollie_fee, vat_percent, effective_from)
+                 VALUES ('12 months', 5.00, 0.35, 21, date('now'))"
+            )->execute();
+        }
+    } catch (PDOException $e) { /* tabel bestaat nog niet tijdens initial install */ }
 }

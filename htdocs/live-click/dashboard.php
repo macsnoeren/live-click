@@ -11,11 +11,11 @@ require APP_ROOT . '/includes/header.php';
 <?php if (!$user['band_id']): ?>
 <div class="alert alert-warning alert-dismissible page-alert fade show mb-0" role="alert">
     <i class="bi bi-exclamation-triangle-fill me-2"></i>
-    <strong>Je bent nog niet aan een band gekoppeld.</strong>
+    <strong>Je bent nog geen lid van een band.</strong>
     <?php if ($user['role'] === 'admin'): ?>
         Ga naar <a href="admin.php" class="alert-link">Admin → Bands</a> om jezelf toe te voegen.
     <?php else: ?>
-        Een admin moet jou koppelen aan een band.
+        <a href="bands.php" class="alert-link">Maak een nieuwe band aan</a> of gebruik een uitnodigingslink.
     <?php endif; ?>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>

@@ -104,8 +104,10 @@ require APP_ROOT . '/includes/header.php';
                 Weet je zeker dat je <strong id="leave-band-name"></strong> wilt verlaten?
                 <div id="leave-leader-warning" class="alert alert-warning py-2 mt-2 mb-0 small" style="display:none">
                     <i class="bi bi-exclamation-triangle me-1"></i>
-                    Je bent de bandleider. Het volgende lid wordt automatisch de nieuwe leider.
-                    Is er niemand anders, dan wordt de band verwijderd.
+                    Je bent de bandleider. Als je vertrekt en er blijft geen andere leider
+                    achter, wordt de band <strong>geblokkeerd</strong> tot een lid het
+                    leiderschap overneemt (en een abonnement heeft). Is er niemand anders meer,
+                    dan wordt de band verwijderd.
                 </div>
             </div>
             <div class="modal-footer border-secondary">
@@ -332,6 +334,19 @@ function setMemberRole(el) {
     }, "json").fail(function() { alert("Rol wijzigen mislukt"); loadBands(); });
 }
 
+// Leiderschap van een leiderloze band overnemen (betaalplichtig).
+function claimLeadership(bandId) {
+    if (!confirm("Leiderschap van deze band overnemen? Hieraan zijn kosten verbonden: je hebt een actief abonnement nodig.")) return;
+    $.post("api/bands.php", JSON.stringify({action: "claim_leadership", band_id: bandId}), function(r) {
+        if (r.ok) { loadBands(); return; }
+        if (r.needs_subscription) {
+            if (confirm(r.error + "\\n\\nNaar de abonnementspagina?")) window.location.href = "subscribe.php";
+            return;
+        }
+        alert(r.error || "Overnemen mislukt");
+    }, "json").fail(function() { alert("Overnemen mislukt"); });
+}
+
 function renderBands(bands) {
     var c = $("#bands-container"); c.empty();
     if (!bands.length) {
@@ -346,6 +361,24 @@ function renderBands(bands) {
         var amLeader    = isLeaderOf(b);
         var canManage   = amLeader || _isAdmin;
         var isEncrypted = (b.is_encrypted == 1);
+        var isBlocked   = (b.blocked == 1);
+        var hasLeader   = (b.members || []).some(function(m){ return m.role === "leader"; });
+
+        var blockedBadge = isBlocked
+            ? \' <span class="badge bg-warning text-dark align-middle" style="font-size:0.65rem"><i class="bi bi-lock-fill"></i> Geblokkeerd</span>\'
+            : \'\';
+        var blockedBanner = \'\';
+        if (isBlocked) {
+            var inner;
+            if (amLeader) {
+                inner = \'Je abonnement is niet (meer) actief. <a href="subscribe.php" class="alert-link">Activeer je abonnement</a> om deze band te deblokkeren.\';
+            } else if (!hasLeader) {
+                inner = \'Deze band heeft geen leider. <button class="btn btn-sm btn-warning ms-1" onclick="claimLeadership(\' + b.id + \')">Leiderschap overnemen</button>\';
+            } else {
+                inner = \'Geblokkeerd: de bandleider heeft geen actief abonnement.\';
+            }
+            blockedBanner = \'<div class="alert alert-warning py-2 small mb-2"><i class="bi bi-exclamation-triangle me-1"></i>\' + inner + \'</div>\';
+        }
 
         var activeBadge = isActive ? \'<span class="badge bg-danger ms-2 align-middle" style="font-size:0.65rem">Actief</span>\' : \'\';
         var vaultBadge  = isEncrypted
@@ -428,10 +461,11 @@ function renderBands(bands) {
             + \'<div class="card h-100 d-flex flex-column">\'
             + \'<div class="card-body pb-2">\'
             + \'<div class="d-flex justify-content-between align-items-start mb-2">\'
-            + \'<h6 class="fw-bold mb-0">\' + escHtml(b.name) + activeBadge + vaultBadge + \'</h6>\'
+            + \'<h6 class="fw-bold mb-0">\' + escHtml(b.name) + activeBadge + vaultBadge + blockedBadge + \'</h6>\'
             + \'<div class="d-flex">\' + editBtn + leaveBtn + deleteBtn + \'</div>\'
             + \'</div>\'
             + (b.description ? \'<p class="text-muted small mb-2">\' + escHtml(b.description) + \'</p>\' : \'\')
+            + blockedBanner
             + \'<div class="mb-2">\' + membersHtml + \'</div>\'
             + \'</div>\'
             + inviteFooter
@@ -474,7 +508,17 @@ function saveBand() {
                       && $("#band-encrypt").is(":checked") && !$("#band-encrypt").prop("disabled");
 
     $.post("api/bands.php", JSON.stringify(data), function(r) {
-        if (!r.ok) { alert(r.error || "Fout bij opslaan"); return; }
+        if (!r.ok) {
+            // Band aanmaken vereist een abonnement → naar de abonnementspagina.
+            if (r.needs_subscription) {
+                bootstrap.Modal.getInstance("#bandModal").hide();
+                if (confirm(r.error + "\\n\\nNaar de abonnementspagina?")) {
+                    window.location.href = "subscribe.php";
+                }
+                return;
+            }
+            alert(r.error || "Fout bij opslaan"); return;
+        }
         bootstrap.Modal.getInstance("#bandModal").hide();
         if (wantEncrypt && r.id) {
             // Nieuwe band meteen versleutelen (kluis aanzetten + herstelcode tonen).

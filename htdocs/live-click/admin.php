@@ -13,6 +13,9 @@ require APP_ROOT . '/includes/header.php';
     <ul class="nav nav-tabs border-secondary mb-3" id="adminTabs">
         <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-users">Gebruikers</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-bands">Bands</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-payments">Betalingen</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-pricing">Tarieven</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-discounts">Kortingscodes</a></li>
     </ul>
 
     <div class="tab-content">
@@ -48,6 +51,96 @@ require APP_ROOT . '/includes/header.php';
                 <table class="table table-dark table-hover table-sm mb-0">
                     <thead><tr><th>Bandnaam</th><th>Beschrijving</th><th>Leden</th><th class="text-center">Versleuteld</th><th></th></tr></thead>
                     <tbody id="bands-tbody"><tr><td colspan="5" class="text-muted">Laden...</td></tr></tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAYMENTS TAB -->
+        <div class="tab-pane fade" id="tab-payments">
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body py-2">
+                            <div class="h4 mb-0" id="pay-active-subs">—</div>
+                            <div class="text-muted small">Actieve abonnementen</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body py-2">
+                            <div class="h4 mb-0" id="pay-total">—</div>
+                            <div class="text-muted small">Totaal ontvangen</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h5 class="mb-2">Abonnementen</h5>
+            <div class="card mb-4">
+                <div class="table-responsive">
+                <table class="table table-dark table-hover table-sm mb-0">
+                    <thead><tr><th>Gebruiker</th><th>Status</th><th>Bedrag</th><th>Interval</th><th>Proef</th><th>Volgende incasso</th><th>Korting</th><th>Mollie</th></tr></thead>
+                    <tbody id="subs-tbody"><tr><td colspan="8" class="text-muted">Laden...</td></tr></tbody>
+                </table>
+                </div>
+            </div>
+
+            <h5 class="mb-2">Betalingen</h5>
+            <div class="card">
+                <div class="table-responsive">
+                <table class="table table-dark table-hover table-sm mb-0">
+                    <thead><tr><th>Datum</th><th>Gebruiker</th><th>Omschrijving</th><th>Bedrag</th><th>Status</th></tr></thead>
+                    <tbody id="payments-tbody"><tr><td colspan="5" class="text-muted">Laden...</td></tr></tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRICING TAB -->
+        <div class="tab-pane fade" id="tab-pricing">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Tarieven</h5>
+                <button class="btn btn-danger btn-sm" onclick="openAddPricing()">
+                    <i class="bi bi-plus-lg"></i> Tarief toevoegen
+                </button>
+            </div>
+            <p class="text-muted small">
+                Het abonnement is een <strong>jaarabonnement</strong>. De prijs is opgebouwd uit
+                basisbedrag + Mollie-transactiekosten + btw. Een nieuw tarief met ingangsdatum geldt
+                voor nieuwe abonnementen én — via de dagelijkse tariefverwerking — voor bestaande
+                abonnees bij hun volgende verlenging.
+            </p>
+            <div id="pricing-current" class="mb-3"></div>
+            <div class="card">
+                <div class="table-responsive">
+                <table class="table table-dark table-hover table-sm mb-0 align-middle">
+                    <thead><tr><th>Ingangsdatum</th><th>Interval</th><th class="text-end">Basis</th><th class="text-end">Mollie</th><th class="text-end">Btw</th><th class="text-end">Totaal</th><th>Status</th><th></th></tr></thead>
+                    <tbody id="pricing-tbody"><tr><td colspan="8" class="text-muted">Laden...</td></tr></tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- DISCOUNTS TAB -->
+        <div class="tab-pane fade" id="tab-discounts">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Kortingscodes</h5>
+                <button class="btn btn-danger btn-sm" onclick="openAddDiscount()">
+                    <i class="bi bi-plus-lg"></i> Code toevoegen
+                </button>
+            </div>
+            <p class="text-muted small">
+                Codes worden in deze app beheerd; de korting wordt toegepast bij het
+                aanmaken van een abonnement. Een actieve code met een geldige periode
+                en (eventueel) onder de gebruikslimiet kan worden ingewisseld.
+            </p>
+            <div class="card">
+                <div class="table-responsive">
+                <table class="table table-dark table-hover table-sm mb-0">
+                    <thead><tr><th>Code</th><th>Korting</th><th>Duur</th><th>Gebruikt</th><th>Geldig tot</th><th class="text-center">Actief</th><th></th></tr></thead>
+                    <tbody id="discounts-tbody"><tr><td colspan="7" class="text-muted">Laden...</td></tr></tbody>
                 </table>
                 </div>
             </div>
@@ -146,6 +239,136 @@ require APP_ROOT . '/includes/header.php';
     </div>
 </div>
 
+<!-- Pricing Modal -->
+<div class="modal fade" id="pricingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Tarief toevoegen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Basisbedrag (€)</label>
+                        <input type="number" id="pr-base" class="form-control" min="0" step="0.01" value="5.00" oninput="updatePrPreview()">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Mollie-kosten (€)</label>
+                        <input type="number" id="pr-fee" class="form-control" min="0" step="0.01" value="0.35" oninput="updatePrPreview()">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Btw (%)</label>
+                        <input type="number" id="pr-vat" class="form-control" min="0" step="0.1" value="21" oninput="updatePrPreview()">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Ingangsdatum</label>
+                        <input type="date" id="pr-eff" class="form-control">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Interval</label>
+                    <select id="pr-interval" class="form-select">
+                        <option value="12 months" selected>Jaarlijks (12 months)</option>
+                        <option value="1 month">Maandelijks (1 month)</option>
+                    </select>
+                </div>
+                <div class="alert alert-secondary py-2 small mb-0">
+                    Totaal dat de klant betaalt: <strong id="pr-preview">—</strong>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
+                <button class="btn btn-danger" onclick="savePricing()">Opslaan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Discount Modal -->
+<div class="modal fade" id="discountModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="discountModalTitle">Kortingscode toevoegen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="disc-id">
+                <div class="mb-3">
+                    <label class="form-label">Code *</label>
+                    <input type="text" id="disc-code" class="form-control text-uppercase" placeholder="WELKOM2026">
+                    <div class="form-text text-muted">Hoofdletters en cijfers; spaties worden verwijderd.</div>
+                </div>
+                <div class="row">
+                    <div class="col-7 mb-3">
+                        <label class="form-label">Type</label>
+                        <select id="disc-type" class="form-select" onchange="updateDiscUnit()">
+                            <option value="percent">Percentage (%)</option>
+                            <option value="fixed">Vast bedrag (€)</option>
+                        </select>
+                    </div>
+                    <div class="col-5 mb-3">
+                        <label class="form-label">Waarde *</label>
+                        <div class="input-group">
+                            <span class="input-group-text" id="disc-unit">%</span>
+                            <input type="number" id="disc-value" class="form-control" min="0" step="0.01">
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Duur</label>
+                    <select id="disc-duration" class="form-select">
+                        <option value="once">Eenmalig (alleen eerste incasso)</option>
+                        <option value="forever">Doorlopend (hele looptijd)</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Omschrijving</label>
+                    <input type="text" id="disc-description" class="form-control" placeholder="Interne notitie (optioneel)">
+                </div>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Max. aantal keer</label>
+                        <input type="number" id="disc-max" class="form-control" min="0" placeholder="onbeperkt">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Geldig tot</label>
+                        <input type="date" id="disc-valid-until" class="form-control">
+                    </div>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="disc-active" checked>
+                    <label class="form-check-label" for="disc-active">Actief</label>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
+                <button class="btn btn-danger" onclick="saveDiscount()">Opslaan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kortingscode verwijderen: bevestiging -->
+<div class="modal fade" id="deleteDiscountModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Code verwijderen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Weet je zeker dat je <strong id="del-disc-name"></strong> wilt verwijderen?
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
+                <button class="btn btn-danger" onclick="confirmDeleteDiscount()">Verwijderen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php
 $extraScripts = '<script>
 var _allUsers = [];
@@ -155,7 +378,17 @@ var _myUserId = ' . (int)$user['id'] . ';
 $(function() {
     loadUsers();
     loadBands();
+    // Betalingen/kortingen pas laden zodra het bijbehorende tabblad wordt geopend.
+    $(\'a[href="#tab-payments"]\').on("shown.bs.tab", loadPayments);
+    $(\'a[href="#tab-pricing"]\').on("shown.bs.tab", loadPricing);
+    $(\'a[href="#tab-discounts"]\').on("shown.bs.tab", loadDiscounts);
 });
+
+function fmtMoney(amount, currency) {
+    var cur = currency || "EUR";
+    try { return Number(amount).toLocaleString("nl-NL", { style: "currency", currency: cur }); }
+    catch (e) { return cur + " " + Number(amount).toFixed(2); }
+}
 
 function loadUsers() {
     $.get("api/users.php", function(data) {
@@ -281,6 +514,255 @@ function saveUser() {
         if (r.ok) { bootstrap.Modal.getInstance("#userModal").hide(); loadUsers(); }
         else { alert(r.error || "Fout"); }
     }, "json");
+}
+
+// ── Betalingen ───────────────────────────────────────────────────────────────
+var SUB_STATUS = {
+    pending:  ["secondary", "In afwachting"],
+    trialing: ["info text-dark", "Proefperiode"],
+    active:   ["success", "Actief"],
+    canceled: ["secondary", "Opgezegd"],
+    suspended:["warning text-dark", "Onderbroken"]
+};
+var PAY_STATUS = {
+    open:    ["secondary", "Open"],
+    pending: ["secondary", "In behandeling"],
+    paid:    ["success", "Betaald"],
+    failed:  ["danger", "Mislukt"],
+    canceled:["secondary", "Geannuleerd"],
+    expired: ["secondary", "Verlopen"],
+    refunded:["warning text-dark", "Terugbetaald"]
+};
+function statusBadge(map, key) {
+    var s = map[key] || ["secondary", key || "—"];
+    return \'<span class="badge bg-\' + s[0] + \'">\' + escHtml(s[1]) + \'</span>\';
+}
+
+function loadPayments() {
+    $.get("api/payments.php", function(data) {
+        if (!data.ok) return;
+        $("#pay-active-subs").text(data.summary.active_subscriptions);
+        $("#pay-total").text(fmtMoney(data.summary.total_paid, "EUR"));
+        renderSubs(data.subscriptions || []);
+        renderPaymentsList(data.payments || []);
+    });
+}
+
+function renderSubs(subs) {
+    var tb = $("#subs-tbody"); tb.empty();
+    if (!subs.length) { tb.append(\'<tr><td colspan="8" class="text-muted">Nog geen abonnementen</td></tr>\'); return; }
+    subs.forEach(function(s) {
+        var proef = (s.status === "trialing" && s.trial_ends_at)
+            ? "tot " + escHtml(s.trial_ends_at)
+            : (s.trial_used == 1 ? "verbruikt" : "—");
+        var ids = [];
+        if (s.mollie_customer_id)     ids.push(escHtml(s.mollie_customer_id));
+        if (s.mollie_subscription_id) ids.push(escHtml(s.mollie_subscription_id));
+        if (s.mollie_mandate_id)      ids.push(escHtml(s.mollie_mandate_id));
+        var mollie = ids.length ? ids.join("<br>") : "—";
+        var statusCell = statusBadge(SUB_STATUS, s.status);
+        if (s.status === "canceled" && s.ends_at) {
+            statusCell += \'<div class="text-muted small">tot \' + escHtml(s.ends_at) + \'</div>\';
+        }
+        tb.append(\'<tr>\'
+            + \'<td class="fw-semibold">\' + escHtml(s.username || "—") + \'<div class="text-muted small">\' + escHtml(s.email || "") + \'</div></td>\'
+            + \'<td>\' + statusCell + \'</td>\'
+            + \'<td>\' + fmtMoney(s.amount, s.currency) + \'</td>\'
+            + \'<td class="text-muted small">\' + escHtml(s.interval || "") + \'</td>\'
+            + \'<td class="text-muted small">\' + proef + \'</td>\'
+            + \'<td class="text-muted small">\' + escHtml(s.next_payment_at || "—") + \'</td>\'
+            + \'<td class="text-muted small">\' + (s.discount_code ? escHtml(s.discount_code) : "—") + \'</td>\'
+            + \'<td class="text-muted small font-monospace" style="font-size:0.7rem">\' + mollie + \'</td>\'
+            + \'</tr>\');
+    });
+}
+
+function renderPaymentsList(pays) {
+    var tb = $("#payments-tbody"); tb.empty();
+    if (!pays.length) { tb.append(\'<tr><td colspan="5" class="text-muted">Nog geen betalingen</td></tr>\'); return; }
+    pays.forEach(function(p) {
+        tb.append(\'<tr>\'
+            + \'<td class="text-muted small">\' + escHtml(p.paid_at || p.created_at || "") + \'</td>\'
+            + \'<td>\' + escHtml(p.username || "—") + \'</td>\'
+            + \'<td class="text-muted small">\' + escHtml(p.description || "") + \'</td>\'
+            + \'<td>\' + fmtMoney(p.amount, p.currency) + \'</td>\'
+            + \'<td>\' + statusBadge(PAY_STATUS, p.status) + \'</td>\'
+            + \'</tr>\');
+    });
+}
+
+// ── Tarieven ─────────────────────────────────────────────────────────────────
+function prMoney(v) { return "€ " + Number(v).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function loadPricing() {
+    $.get("api/pricing.php", function(d) { if (d.ok) renderPricing(d.pricing || []); });
+}
+
+function renderPricing(rows) {
+    var cur = rows.find(function(r){ return r.is_current; });
+    $("#pricing-current").html(cur
+        ? \'<div class="alert alert-success py-2 mb-0">Huidig tarief: <strong>\' + prMoney(cur.total) + \'</strong> per \' + escHtml(cur.interval)
+          + \' &middot; basis \' + prMoney(cur.base_amount) + \' + Mollie \' + prMoney(cur.mollie_fee) + \' + \' + escHtml(String(cur.vat_percent)) + \'% btw</div>\'
+        : \'<div class="alert alert-warning py-2 mb-0">Geen actief tarief.</div>\');
+    var tb = $("#pricing-tbody"); tb.empty();
+    if (!rows.length) { tb.append(\'<tr><td colspan="8" class="text-muted">Nog geen tarieven</td></tr>\'); return; }
+    rows.forEach(function(r) {
+        var status = r.is_current ? \'<span class="badge bg-success">Huidig</span>\'
+            : (r.is_scheduled ? \'<span class="badge bg-info text-dark">Gepland</span>\' : \'<span class="badge bg-secondary">Verlopen</span>\');
+        var del = r.is_scheduled
+            ? \'<button class="btn btn-xs btn-outline-danger" onclick="askDeletePricing(\' + r.id + \')" title="Verwijderen"><i class="bi bi-trash"></i></button>\'
+            : \'\';
+        tb.append(\'<tr>\'
+            + \'<td>\' + escHtml(r.effective_from) + \'</td>\'
+            + \'<td class="text-muted small">\' + escHtml(r.interval) + \'</td>\'
+            + \'<td class="text-end">\' + prMoney(r.base_amount) + \'</td>\'
+            + \'<td class="text-end">\' + prMoney(r.mollie_fee) + \'</td>\'
+            + \'<td class="text-end">\' + escHtml(String(r.vat_percent)) + \'%</td>\'
+            + \'<td class="text-end fw-semibold">\' + prMoney(r.total) + \'</td>\'
+            + \'<td>\' + status + \'</td>\'
+            + \'<td>\' + del + \'</td>\'
+            + \'</tr>\');
+    });
+}
+
+function updatePrPreview() {
+    var b = parseFloat($("#pr-base").val()) || 0,
+        f = parseFloat($("#pr-fee").val()) || 0,
+        v = parseFloat($("#pr-vat").val()) || 0;
+    $("#pr-preview").text(prMoney(Math.round((b + f) * (1 + v / 100) * 100) / 100));
+}
+
+function openAddPricing() {
+    $("#pr-base").val("5.00"); $("#pr-fee").val("0.35"); $("#pr-vat").val("21");
+    $("#pr-interval").val("12 months");
+    $("#pr-eff").val(new Date().toISOString().substring(0, 10));
+    updatePrPreview();
+    new bootstrap.Modal("#pricingModal").show();
+}
+
+function savePricing() {
+    var data = {
+        base_amount: $("#pr-base").val(), mollie_fee: $("#pr-fee").val(),
+        vat_percent: $("#pr-vat").val(), interval: $("#pr-interval").val(),
+        effective_from: $("#pr-eff").val()
+    };
+    if (!(parseFloat(data.base_amount) > 0)) { alert("Basisbedrag moet groter dan 0 zijn."); return; }
+    if (!data.effective_from) { alert("Kies een ingangsdatum."); return; }
+    $.post("api/pricing.php", JSON.stringify(data), function(r) {
+        if (r.ok) { bootstrap.Modal.getInstance("#pricingModal").hide(); loadPricing(); }
+        else alert(r.error || "Fout");
+    }, "json");
+}
+
+var _delPrId = null;
+function askDeletePricing(id) {
+    _delPrId = id;
+    if (!confirm("Dit geplande tarief verwijderen?")) return;
+    $.ajax({ url: "api/pricing.php", type: "DELETE", contentType: "application/json",
+        data: JSON.stringify({ id: _delPrId }), dataType: "json",
+        success: function(r) { if (r.ok) loadPricing(); else alert(r.error || "Verwijderen mislukt"); } });
+}
+
+// ── Kortingscodes ────────────────────────────────────────────────────────────
+var _allDiscounts = [];
+
+function loadDiscounts() {
+    $.get("api/discounts.php", function(data) {
+        _allDiscounts = data.codes || [];
+        renderDiscounts(_allDiscounts);
+    });
+}
+
+function renderDiscounts(codes) {
+    var tb = $("#discounts-tbody"); tb.empty();
+    if (!codes.length) { tb.append(\'<tr><td colspan="7" class="text-muted">Nog geen codes</td></tr>\'); return; }
+    codes.forEach(function(c) {
+        var korting = c.type === "percent" ? (Number(c.value) + "%") : fmtMoney(c.value, "EUR");
+        var duur = c.duration === "forever" ? "Doorlopend" : "Eenmalig";
+        var gebruikt = c.times_redeemed + (c.max_redemptions != null ? " / " + c.max_redemptions : "");
+        var actief = (c.active == 1)
+            ? \'<i class="bi bi-check-circle-fill text-success"></i>\'
+            : \'<span class="text-muted">—</span>\';
+        tb.append(\'<tr>\'
+            + \'<td class="fw-semibold font-monospace">\' + escHtml(c.code) + \'</td>\'
+            + \'<td>\' + korting + \'</td>\'
+            + \'<td class="text-muted small">\' + duur + \'</td>\'
+            + \'<td class="text-muted small">\' + escHtml(gebruikt) + \'</td>\'
+            + \'<td class="text-muted small">\' + escHtml(c.valid_until || "—") + \'</td>\'
+            + \'<td class="text-center">\' + actief + \'</td>\'
+            + \'<td class="text-nowrap">\'
+            + \'<button class="btn btn-xs btn-outline-secondary me-1" onclick="openEditDiscount(\' + c.id + \')" title="Bewerken"><i class="bi bi-pencil"></i></button>\'
+            + \'<button class="btn btn-xs btn-outline-danger" onclick="askDeleteDiscount(\' + c.id + \')" title="Verwijderen"><i class="bi bi-trash"></i></button>\'
+            + \'</td>\'
+            + \'</tr>\');
+    });
+}
+
+function updateDiscUnit() {
+    $("#disc-unit").text($("#disc-type").val() === "fixed" ? "€" : "%");
+}
+
+function openAddDiscount() {
+    $("#discountModalTitle").text("Kortingscode toevoegen");
+    $("#disc-id").val(""); $("#disc-code").val(""); $("#disc-type").val("percent");
+    $("#disc-value").val(""); $("#disc-duration").val("once"); $("#disc-description").val("");
+    $("#disc-max").val(""); $("#disc-valid-until").val(""); $("#disc-active").prop("checked", true);
+    updateDiscUnit();
+    new bootstrap.Modal("#discountModal").show();
+}
+
+function openEditDiscount(id) {
+    var c = _allDiscounts.find(function(x) { return x.id === id; });
+    if (!c) return;
+    $("#discountModalTitle").text("Kortingscode bewerken");
+    $("#disc-id").val(c.id); $("#disc-code").val(c.code); $("#disc-type").val(c.type);
+    $("#disc-value").val(c.value); $("#disc-duration").val(c.duration);
+    $("#disc-description").val(c.description || "");
+    $("#disc-max").val(c.max_redemptions != null ? c.max_redemptions : "");
+    $("#disc-valid-until").val(c.valid_until ? String(c.valid_until).substring(0, 10) : "");
+    $("#disc-active").prop("checked", c.active == 1);
+    updateDiscUnit();
+    new bootstrap.Modal("#discountModal").show();
+}
+
+function saveDiscount() {
+    var data = {
+        id: $("#disc-id").val(),
+        code: $("#disc-code").val().trim(),
+        type: $("#disc-type").val(),
+        value: $("#disc-value").val(),
+        duration: $("#disc-duration").val(),
+        description: $("#disc-description").val().trim(),
+        max_redemptions: $("#disc-max").val(),
+        valid_until: $("#disc-valid-until").val(),
+        active: $("#disc-active").is(":checked") ? 1 : 0
+    };
+    if (!data.code) { alert("Code is verplicht."); return; }
+    if (!(parseFloat(data.value) > 0)) { alert("Waarde moet groter dan 0 zijn."); return; }
+    $.post("api/discounts.php", JSON.stringify(data), function(r) {
+        if (r.ok) { bootstrap.Modal.getInstance("#discountModal").hide(); loadDiscounts(); }
+        else { alert(r.error || "Fout"); }
+    }, "json");
+}
+
+var _delDiscId = null;
+function askDeleteDiscount(id) {
+    var c = _allDiscounts.find(function(x) { return x.id === id; });
+    _delDiscId = id;
+    $("#del-disc-name").text(c ? c.code : "deze code");
+    new bootstrap.Modal("#deleteDiscountModal").show();
+}
+function confirmDeleteDiscount() {
+    if (!_delDiscId) return;
+    $.ajax({ url: "api/discounts.php", type: "DELETE", contentType: "application/json",
+        data: JSON.stringify({ id: _delDiscId }), dataType: "json",
+        success: function(r) {
+            bootstrap.Modal.getInstance("#deleteDiscountModal").hide();
+            if (r.ok) loadDiscounts();
+            else alert(r.error || "Verwijderen mislukt");
+        },
+        error: function(xhr) { alert("Verwijderen mislukt (HTTP " + xhr.status + ")"); }
+    });
 }
 </script>';
 require APP_ROOT . '/includes/footer.php';

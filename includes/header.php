@@ -9,7 +9,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= htmlspecialchars($pageTitle ?? 'LiveGig') ?></title>
+    <title><?= htmlspecialchars($pageTitle ?? 'LiveClick') ?></title>
     <meta name="csrf-token" content="<?= htmlspecialchars(csrfToken()) ?>">
     <!-- Vendor-bestanden lokaal opgeslagen — app werkt ook zonder internet -->
     <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
@@ -134,6 +134,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     </span></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="profile.php"><i class="bi bi-person-gear me-2"></i>Profiel &amp; beveiliging</a></li>
+                    <li><a class="dropdown-item" href="subscribe.php"><i class="bi bi-stars me-2"></i>Abonnement</a></li>
                     <li><a class="dropdown-item" href="privacy.php"><i class="bi bi-shield-lock me-2"></i>Versleuteling &amp; privacy</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="handleiding.php"><i class="bi bi-book me-2"></i>Handleiding</a></li>

@@ -78,22 +78,88 @@ if (function_exists('currentUser')) {
         </div>
     </div>
 </div>
+
+<!-- E2EE: herinnering om een herstelcode aan te maken. Verschijnt alleen als de
+     kluis ontgrendeld is én er nog geen herstelcode is ingesteld (per gebruiker).
+     Zonder herstelcode kan niemand — ook een admin niet — de kluis openen na een
+     vergeten wachtwoord. -->
+<div class="modal fade" id="lgRecoveryNudge" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-shield-exclamation"></i> Maak een herstelcode aan</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2">
+                    Je bent lid van een <strong>versleutelde band</strong>. De nummers, setlijsten en notities
+                    daarvan zijn zo opgeslagen dat <strong>alleen de bandleden ze kunnen lezen</strong> — je opent
+                    ze met je wachtwoord.
+                </p>
+                <p class="text-muted small mb-2">
+                    Je hebt zelf nog geen herstelcode. Vergeet je je wachtwoord, dan kan <strong>niemand</strong> dat
+                    voor je terugzetten — ook een beheerder niet. Zonder herstelcode raak je dan je toegang tot de
+                    band-inhoud kwijt.
+                </p>
+                <p class="text-muted small mb-0">
+                    Een herstelcode is je eigen reservesleutel om er altijd weer bij te komen. Het kost één minuut.
+                </p>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Later</button>
+                <a href="profile.php#recovery-card" class="btn btn-warning" onclick="lgDismissRecoveryNudge()">
+                    <i class="bi bi-shield-lock"></i> Herstelcode aanmaken
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 <script>
 (function () {
     var inEncBand = <?= $lgInEncryptedBand ? 'true' : 'false' ?>;
     if (!window.LGKeys) return;
 
+    // Eénmalig per sessie nudgen om een herstelcode in te stellen. We tonen het
+    // alleen als de kluis ontgrendeld is (dan kán de gebruiker er een maken) en
+    // er nog geen herstelcode bestaat (api/keys.php → has_recovery).
+    function maybeNudgeRecovery() {
+        try { if (sessionStorage.getItem('lgRecoveryNudgeDismissed')) return; } catch (e) {}
+        // Niet nudgen op de profielpagina zelf — daar staat de herstelcode-kaart al,
+        // en anders blijft de popup terugkomen terwijl je 'm juist aanmaakt.
+        if (/\/profile\.php$/.test(location.pathname)) return;
+        if (!window.jQuery) return;
+        jQuery.get('api/keys.php').done(function (st) {
+            if (!st || !st.ok || !st.has_keys || st.has_recovery) return;
+            var el = document.getElementById('lgRecoveryNudge');
+            if (window.bootstrap && el) {
+                try {
+                    new bootstrap.Modal(el).show();
+                    el.addEventListener('hidden.bs.modal', function () {
+                        try { sessionStorage.setItem('lgRecoveryNudgeDismissed', '1'); } catch (e) {}
+                    }, { once: true });
+                } catch (e) {}
+            }
+        });
+    }
+
     LGKeys.bootstrap().then(function (state) {
         if (!inEncBand) return;
-        if (state === 'unlocked') return;
         if (state === 'unsupported') return; // geen WebCrypto → niets te ontgrendelen
+        if (state === 'unlocked') { maybeNudgeRecovery(); return; }
         // Kluis zit op slot terwijl er versleutelde bands zijn → prompt tonen.
         if (window.bootstrap && document.getElementById('lgUnlockModal')) {
             try { new bootstrap.Modal('#lgUnlockModal').show(); } catch (e) {}
         }
     }).catch(function () {});
 })();
+
+// Wordt aangeroepen vanuit de "Herstelcode aanmaken"-knop in de nudge-modal:
+// onderdruk de nudge voor de rest van deze sessie zodat hij niet opnieuw
+// verschijnt terwijl de gebruiker naar Profiel navigeert om er een te maken.
+function lgDismissRecoveryNudge() {
+    try { sessionStorage.setItem('lgRecoveryNudgeDismissed', '1'); } catch (e) {}
+}
 
 function lgShowRecover() {
     document.getElementById('lg-recover-box').style.display = '';

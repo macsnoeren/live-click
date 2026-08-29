@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/mollie.php';
 requireLogin();
 csrfRequire();
 header('Content-Type: application/json');
@@ -43,6 +44,8 @@ function getBandsForUser(PDO $db, int $userId, bool $allBands = false): array {
         foreach ($b['members'] as $m) {
             if ((int)$m['id'] === $userId) { $b['my_role'] = $m['role']; break; }
         }
+        // Facturatie: is deze band geblokkeerd (geen leider met actief abonnement)?
+        $b['blocked'] = bandIsBlocked((int)$b['id']) ? 1 : 0;
     }
     return $bands;
 }
@@ -110,6 +113,32 @@ if ($method === 'POST') {
         exit;
     }
 
+    /* ---- Leiderschap van een leiderloze band overnemen ---- */
+    if ($action === 'claim_leadership') {
+        $bandId = (int)($data['band_id'] ?? 0);
+        if (!$bandId) { echo json_encode(['ok'=>false,'error'=>'Band verplicht']); exit; }
+        if (!isBandMember($db, $bandId, $user['id'])) {
+            echo json_encode(['ok'=>false,'error'=>'Je bent geen lid van deze band']); exit;
+        }
+        // Alleen overnemen als de band geen leider (meer) heeft.
+        $hasLeader = $db->prepare("SELECT 1 FROM band_members WHERE band_id=? AND role='leader'");
+        $hasLeader->execute([$bandId]);
+        if ($hasLeader->fetch()) {
+            echo json_encode(['ok'=>false,'error'=>'Deze band heeft al een leider']); exit;
+        }
+        // Leider worden vereist actieve facturatie (geen nieuwe proef bij overname).
+        // Admins zijn vrijgesteld (userCanLeadBands).
+        if (billingEnforced() && !userCanLeadBands($user['id'])) {
+            echo json_encode(['ok'=>false,'needs_subscription'=>true,
+                'error'=>'Leider worden vereist een actief abonnement.']); exit;
+        }
+        $db->prepare("UPDATE band_members SET role='leader' WHERE band_id=? AND user_id=?")
+           ->execute([$bandId, $user['id']]);
+        auditLog('band.leadership_claimed', 'band', $bandId, ['user_id'=>$user['id']]);
+        echo json_encode(['ok'=>true]);
+        exit;
+    }
+
     $id        = (int)($data['id'] ?? 0);
     $name      = trim($data['name'] ?? '');
     $desc      = trim($data['description'] ?? '');
@@ -124,7 +153,17 @@ if ($method === 'POST') {
         }
         $db->prepare('UPDATE bands SET name=?,description=? WHERE id=?')->execute([$name, $desc, $id]);
     } else {
-        // Aanmaken — elke ingelogde gebruiker; de maker wordt leider.
+        // Aanmaken — de maker wordt leider, en leider zijn is betaald. Vereist
+        // dus een actief abonnement of lopende proefperiode. Lid/kijker zijn
+        // blijft gratis (dat loopt via join.php, niet hierlangs).
+        if (billingEnforced() && !userCanLeadBands($user['id'])) {
+            echo json_encode([
+                'ok' => false,
+                'needs_subscription' => true,
+                'trial_used' => userTrialUsed($user['id']),
+                'error' => 'Een band aanmaken vereist een abonnement. Start je gratis proefmaand om door te gaan.',
+            ]); exit;
+        }
         $db->prepare('INSERT INTO bands (name,description) VALUES (?,?)')->execute([$name, $desc]);
         $id = $db->lastInsertId();
         $db->prepare('INSERT OR IGNORE INTO band_members (user_id,band_id,role) VALUES (?,?,?)')
@@ -161,19 +200,15 @@ if ($method === 'DELETE') {
         $db->prepare('DELETE FROM band_members WHERE band_id=? AND user_id=?')->execute([$bandId, $userId]);
 
         if ($wasLeader) {
-            // Promote the next member alphabetically, or delete the band if empty
-            $next = $db->prepare(
-                'SELECT u.id FROM band_members bm JOIN users u ON u.id = bm.user_id
-                 WHERE bm.band_id = ? ORDER BY u.username LIMIT 1'
-            );
-            $next->execute([$bandId]);
-            $newLeader = $next->fetchColumn();
-
-            if ($newLeader) {
-                $db->prepare("UPDATE band_members SET role='leader' WHERE band_id=? AND user_id=?")
-                   ->execute([$bandId, $newLeader]);
-            } else {
-                // No members left — remove the band entirely
+            // GEEN stille auto-promotie meer: leider zijn is betaald, dus we
+            // duwen niemand ongevraagd in een betaalplichtige rol. Zijn er nog
+            // andere leiders, dan loopt de band gewoon door. Is er geen leider
+            // meer, dan komt de band in een "leiderloos" → geblokkeerd-staat
+            // (bandIsBlocked) totdat een lid het leiderschap claimt (en betaalt).
+            // Alleen als er helemaal niemand meer over is, ruimen we de band op.
+            $remaining = $db->prepare('SELECT COUNT(*) FROM band_members WHERE band_id=?');
+            $remaining->execute([$bandId]);
+            if ((int)$remaining->fetchColumn() === 0) {
                 $db->prepare('DELETE FROM bands WHERE id=?')->execute([$bandId]);
             }
         }

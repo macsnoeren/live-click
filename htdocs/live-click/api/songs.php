@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../bootstrap.php';
 require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/storage.php';
 requireLogin();
 csrfRequire();
 header('Content-Type: application/json');
@@ -103,6 +104,35 @@ if ($method === 'POST') {
     if ($encrypted && $encBlob === null) {
         echo json_encode(['ok'=>false,'error'=>'Deze band is versleuteld; er is geen versleutelde inhoud meegegeven.']);
         exit;
+    }
+
+    // Fair-use: blokkeer opslaan als de NIEUWE inhoud het opslagquotum van de
+    // bandeigenaar (de leider) overschrijdt. We kijken naar het verschil met de
+    // bestaande versie: inkorten of gelijk blijven mag altijd, ook al zit je al
+    // op de limiet — zo kun je altijd ruimte vrijmaken.
+    if ($effectiveBandId) {
+        $ownerId = bandStorageOwnerId($effectiveBandId);
+        if ($ownerId !== null) {
+            $newBytes = $encrypted
+                ? strlen((string)$encBlob)
+                : strlen((string)$title) + strlen((string)$artist) + strlen((string)$desc)
+                  + strlen((string)$drumNotation) + strlen((string)$drumSvg)
+                  + strlen((string)$lyrics) + strlen((string)$chords);
+            $oldBytes = $id ? songStorageBytes((int)$id) : 0;
+            $delta    = $newBytes - $oldBytes;
+            if ($delta > 0) {
+                $usage = userStorageUsage($ownerId);
+                if ($usage['used_bytes'] + $delta > $usage['quota_bytes']) {
+                    http_response_code(413);
+                    echo json_encode([
+                        'ok'         => false,
+                        'over_quota' => true,
+                        'error'      => 'Opslaglimiet (fair-use) bereikt. Kort de inhoud in of verwijder iets om ruimte vrij te maken.',
+                    ]);
+                    exit;
+                }
+            }
+        }
     }
 
     try {

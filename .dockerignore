@@ -1,0 +1,14 @@
+# Niet meebouwen in de image
+.git
+.gitignore
+.claude/
+
+# Lokale data hoort op het persistent volume, niet in de image
+data/
+
+# Secrets blijven buiten de image — configureer via omgevingsvariabelen
+includes/config.local.php
+
+# Docs / cluster-manifests zijn niet nodig in de runtime-image
+k8s/
+*.md
